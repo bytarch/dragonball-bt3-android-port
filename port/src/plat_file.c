@@ -17,12 +17,22 @@
 
 #ifdef __EMSCRIPTEN__
 /* The web host (port/tools/webdata.js, a --js-library): the disc image over HTTP. The C side below keeps its
-   fopen callers' shape; the image answers through these four primitives (the badge of the other builds). */
+   fopen callers' shape; the image answers through these four primitives. EM_ASYNC_JS bodies (not js-library
+   function attributes) are what Emscripten reliably turns into suspensible calls (the link is -sASYNCIFY). */
 #include <emscripten.h>
-extern int WebData_Open(const char *path);
-extern long WebData_Size(int h);
-extern size_t WebData_Read(int h, long off, void *buf, size_t bytes);
-extern void WebData_Close(int h);
+
+EM_ASYNC_JS(int, WebData_Open, (const char *path), {
+  return 0 + (await WEB_DATA.open(UTF8ToString($0)));
+});
+EM_JS(long, WebData_Size, (int h), {
+  return WEB_DATA.sizeOf($0) | 0;
+});
+EM_ASYNC_JS(size_t, WebData_Read, (int h, long off, size_t bytes, void *buf), {
+  return await WEB_DATA.read($0, $1, $2, $3);
+});
+EM_JS(void, WebData_Close, (int h), {
+  WEB_DATA.close($0);
+});
 #endif
 
 #define SECTOR 2048

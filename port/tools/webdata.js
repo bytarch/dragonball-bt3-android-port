@@ -153,17 +153,8 @@ WEB_DATA = {
   }
 };
 
-var LibraryWebDataBridge = {
-  /* One handle per archive or file the C side asks for; size comes back with it (the game sizes buffers by it). */
-  WebData_Open__async: true,
-  WebData_Open: async function (path) { return await WEB_DATA.open(UTF8ToString(path)); },
-
-  WebData_Size: function (h) { return WEB_DATA.sizeOf(h); },
-
-  WebData_Read__async: true,
-  WebData_Read: async function (h, off, bytes, buf) { return await WEB_DATA.read(h, off, bytes, buf); },
-
-  WebData_Close: function (h) { WEB_DATA.close(h); },
+var LibraryWebData = {
+  $WEB_DATA: WEB_DATA,
 };
+addToLibrary(LibraryWebData);
 
-addToLibrary(LibraryWebDataBridge);
