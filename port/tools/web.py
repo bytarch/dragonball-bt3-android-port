@@ -164,8 +164,38 @@ def shaders():
 
 
 def data_source(f):
-    """The wasm assembler wants the bare section directives (the ELF builds take the files unchanged)."""
-    return re.sub(r"^\.section\s+\.(data|bss|rodata)\s*$", r".\1", f.read_text(), flags=re.M)
+    """The wasm assembler takes neither the ELF section syntax nor a symbol without an explicit size:
+    every table goes to .data (BSS included), and a .size follows each label."""
+    out, cur, size = [], None, 0
+
+    def flush():
+        nonlocal cur, size
+        if cur is not None:
+            out.append(".size %s, %d" % (cur, size))
+            cur = None
+
+    for line in f.read_text().splitlines():
+        s = line.strip()
+        if s.startswith(".section"):
+            flush()
+            out.append(".data")
+        elif s.startswith(".globl"):
+            flush()
+            out.append(line)
+        elif re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*:", s):
+            flush()
+            out.append(line)
+            cur, size = s[:-1], 0
+        else:
+            out.append(line)
+            if cur is not None:
+                if s.startswith(".space") or s.startswith(".zero"):
+                    size += int(s.split()[1])
+                elif s.startswith(".long") or s.startswith(".word") or s.startswith(".byte"):
+                    step = 4 if s.startswith(".long") else 2 if s.startswith(".word") else 1
+                    size += step * len([x for x in s.split(None, 1)[1].split(",") if x.strip()])
+    flush()
+    return "\n".join(out) + "\n"
 
 
 def compile_all():
