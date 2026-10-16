@@ -267,14 +267,16 @@ Image Img_Load(const std::string &path) {
     if (SUCCEEDED(factory->CreateDecoderFromFilename(widen(path).c_str(), NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder)) &&
         SUCCEEDED(decoder->GetFrame(0, &frame)) &&
         SUCCEEDED(factory->CreateFormatConverter(&converter)) &&
-        SUCCEEDED(converter->Initialize(frame, GUID_WICPixelFormat32bppPRGB, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom)) &&
+        SUCCEEDED(converter->Initialize(frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom)) &&
         SUCCEEDED(converter->GetSize(&img.width, &img.height))) {
         img.rgba = (unsigned char *)malloc((size_t)img.width * img.height * 4);
         if (img.rgba == NULL) {
             img.width = img.height = 0;
         } else {
             WICRect rect = {0, 0, img.width, img.height};
-            if (FAILED(converter->CopyPixels(&rect, img.width * 4, (UINT)img.width * img.height * 4, img.rgba))) {
+            // (rect, x, y, lines, buffer size, buffer): the picture is drawn opaque, so straight RGBA is what the
+            // texture wants
+            if (FAILED(converter->CopyPixels(&rect, 0, 0, (UINT)img.height, (UINT)img.width * img.height * 4, img.rgba))) {
                 free(img.rgba);
                 img.rgba = NULL;
                 img.width = img.height = 0;
