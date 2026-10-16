@@ -315,11 +315,13 @@ def link():
 
     DIST.mkdir(parents=True, exist_ok=True)
     extra, typed, stubs, need = [], set(), False, []
-    for _ in range(8):
+    for i in range(8):
         r = run(link_cmd(extra))
         need = sorted(set(re.findall(r"undefined symbol: (\w+)", r.stderr)))
         mism = sorted(set(re.findall(r"symbol type mismatch: (\w+)", r.stderr)) - typed)
         mism = [m for m in mism if not re.fullmatch(r"D_[0-9A-F]+", m)]  # the --defsym anchors are addresses, not functions
+        first = next((l.strip() for l in r.stderr.splitlines() if "error" in l), "")
+        print(f"link {i + 1}: {len(extra)} extra objects, {len(mism)} mismatched, {len(need)} undefined: {first[-160:]}", flush=True)
         if mism:
             # a table points at a function the objects do not define (a stub yet to come): say so in the tables
             typed |= set(mism)
@@ -338,6 +340,8 @@ def link():
             if s.returncode:
                 print(s.stderr[:600])
                 return False
+            have = {t[-1] for t in (l.split() for l in run([llvm_nm(), "--defined-only", str(GEN / "stubs.o")]).stdout.splitlines()) if len(t) >= 2}
+            print(f"stubs: {len(need)} wanted, {len(have)} defined in stubs.o", flush=True)
             stubs = True
             extra = [str(GEN / "stubs.o")]
             continue
