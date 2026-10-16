@@ -301,7 +301,7 @@ def link():
                                 "-sEXPORTED_FUNCTIONS=_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",
                                 "--no-entry", "--shell-file", str(HERE / "web_shell.html"),
                                 f"-I{SDL3 / 'include'}", f"-L{SDL3 / 'lib'}", "-lSDL3",
-                                "-Wl,--wrap=Progress_Main"] + sdl3_link_flags() + extra
+                                "-Wl,--wrap=Progress_Main", "-Wl,--defsym=D_3BE71C=0x3BE71C"] + sdl3_link_flags() + extra
 
     DIST.mkdir(parents=True, exist_ok=True)
     extra, typed, stubs, need = [], set(), False, []
@@ -309,6 +309,7 @@ def link():
         r = run(link_cmd(extra))
         need = sorted(set(re.findall(r"undefined symbol: (\w+)", r.stderr)))
         mism = sorted(set(re.findall(r"symbol type mismatch: (\w+)", r.stderr)) - typed)
+        mism = [m for m in mism if not re.fullmatch(r"D_[0-9A-F]+", m)]  # the --defsym anchors are addresses, not functions
         if mism:
             # a table points at a function the objects do not define (a stub yet to come): say so in the tables
             typed |= set(mism)
