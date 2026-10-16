@@ -54,6 +54,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.bytarch.dbt3.ui.components.BusyBar
 import com.bytarch.dbt3.ui.components.kiBackground
+import com.bytarch.dbt3.ui.screens.BootScreen
 import com.bytarch.dbt3.ui.screens.CheatsScreen
 import com.bytarch.dbt3.ui.screens.ControlsScreen
 import com.bytarch.dbt3.ui.screens.HomeScreen
@@ -89,6 +90,12 @@ private enum class Dest(val route: String, val label: Int, val icon: ImageVector
 
 @Composable
 private fun Dbt3App(vm: AppViewModel) {
+    val boot by vm.boot.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.runBoot() }
+    if (!boot.done) {
+        BootScreen(boot)
+        return
+    }
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route

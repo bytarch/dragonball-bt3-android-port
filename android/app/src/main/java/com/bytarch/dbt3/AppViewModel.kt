@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.LocaleManager
 import android.os.Build
 import android.os.LocaleList
+import android.os.SystemClock
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -13,11 +14,13 @@ import java.io.IOException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytarch.dbt3.data.AppUpdates
+import com.bytarch.dbt3.data.BuildFeed
 import com.bytarch.dbt3.data.CatalogState
 import com.bytarch.dbt3.data.EngineSettings
 import com.bytarch.dbt3.data.Renderer
 import com.bytarch.dbt3.data.Net
 import com.bytarch.dbt3.data.TextureCatalog
+import com.bytarch.dbt3.data.UpdateInfo
 import com.bytarch.dbt3.data.UpdateState
 import com.bytarch.dbt3.data.formatBytes
 import com.bytarch.dbt3.data.ExtraItem
@@ -41,6 +44,7 @@ import com.bytarch.dbt3.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -53,6 +57,15 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /** A long operation in progress (shown as a bar with its text). */
 data class Busy(val title: String, val detail: String = "")
+
+/** What a boot check has got to: not reached yet, being done now, or done. */
+enum class StepState { Waiting, Working, Ok, Warn, Fail }
+
+/** One line of the boot screen. */
+data class BootStep(val label: String, val detail: String = "", val state: StepState = StepState.Waiting)
+
+/** The boot screen: the checks in order, and whether the app is through them. */
+data class BootState(val steps: List<BootStep> = emptyList(), val done: Boolean = false)
 
 /** Where the game ISO is fetched from when the player has no disc image of their own. */
 private const val ISO_URL = "https://gcode.bytarch.com/DBT3-MOBILE.iso"
@@ -191,6 +204,87 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _settings.value = settings.snapshot()
     }
 
+    // ---- boot
+
+    private val _boot = MutableStateFlow(BootState())
+    val boot: StateFlow<BootState> = _boot.asStateFlow()
+    private var bootJob: Job? = null
+
+    /**
+     * The launch checks, in the order a game does them: storage first (nothing works without it), then the unpacked
+     * data, the engine, the server, and whether this is the newest build. Nothing here blocks the app — a failed check
+     * is a line on the boot screen, and the home screen is the answer to all of them.
+     */
+    fun runBoot() {
+        if (bootJob?.isActive == true || _boot.value.done) return
+        bootJob = viewModelScope.launch {
+            val started = SystemClock.elapsedRealtime()
+            _boot.value = BootState(
+                listOf(
+                    BootStep(str(R.string.boot_files)),
+                    BootStep(str(R.string.boot_data)),
+                    BootStep(str(R.string.boot_engine)),
+                    BootStep(str(R.string.boot_server)),
+                    BootStep(str(R.string.boot_version)),
+                )
+            )
+
+            // storage: the saves and the unpacked data live under the app's own folder on shared storage
+            step(0, state = StepState.Working)
+            val writable = withContext(Dispatchers.IO) { paths.ensure(); paths.root.canWrite() }
+            val free = withContext(Dispatchers.IO) { formatBytes(paths.root.usableSpace) }
+            step(0, detail = if (writable) str(R.string.boot_free, free) else str(R.string.boot_no_storage), state = if (writable) StepState.Ok else StepState.Fail)
+            delay(120)
+
+            // the game's data: the marker the installer leaves behind, which is also what the engine starts from
+            step(1, state = StepState.Working)
+            val data = withContext(Dispatchers.IO) { installer.currentState() }
+            step(
+                1,
+                detail = if (data is InstallState.Installed)
+                    str(if (data.modified) R.string.game_data_ok_mod else R.string.game_data_ok, data.files, formatBytes(data.bytes))
+                else str(R.string.boot_no_data),
+                state = if (data is InstallState.Installed) StepState.Ok else StepState.Warn,
+            )
+            delay(120)
+
+            // the engine itself: the native library has to be in the build or there is nothing to play
+            step(2, state = StepState.Working)
+            step(2, detail = str(if (engineAvailable) R.string.boot_ready else R.string.boot_no_engine), state = if (engineAvailable) StepState.Ok else StepState.Warn)
+            delay(120)
+
+            // the server, and with it the newest build: no connection is not fatal, the game is all local
+            step(3, state = StepState.Working)
+            step(4, state = StepState.Working)
+            val feed = withContext(Dispatchers.IO) { runCatching { BuildFeed.fetch() }.getOrNull() }
+            if (feed == null) {
+                step(3, detail = str(R.string.boot_offline), state = StepState.Warn)
+                step(4, detail = str(R.string.boot_offline), state = StepState.Warn)
+            } else {
+                step(3, detail = str(R.string.boot_online), state = StepState.Ok)
+                if (feed.newerThan(BuildConfig.VERSION_CODE)) {
+                    // the update dialog (UpdateDialog) takes it from here, once the boot screen is gone
+                    _update.value = UpdateState.Available(UpdateInfo(feed.version, feed.notes, feed.apkUrl, feed.size, false))
+                    step(4, detail = str(R.string.boot_new_build, feed.version), state = StepState.Ok)
+                } else {
+                    step(4, detail = str(R.string.boot_up_to_date), state = StepState.Ok)
+                }
+            }
+
+            // never a flash of a screen the player cannot read
+            val left = 1400L - (SystemClock.elapsedRealtime() - started)
+            if (left > 0) delay(left)
+            _boot.value = _boot.value.copy(done = true)
+        }
+    }
+
+    private fun step(i: Int, detail: String = "", state: StepState = StepState.Waiting) {
+        val steps = _boot.value.steps.toMutableList()
+        if (i !in steps.indices) return
+        steps[i] = steps[i].copy(detail = detail, state = state)
+        _boot.value = _boot.value.copy(steps = steps)
+    }
+
     fun refreshAll() {
         viewModelScope.launch(Dispatchers.IO) {
             _packs.value = packs.list()
@@ -214,6 +308,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         coroutine between chunks, so Cancel stops it part-way and leaves nothing behind.
      */
     fun downloadIso() = startInstall {
+        // the data is already there, from an earlier install: nothing to download (also guards a stale UI
+        // that still shows the button, and is what the installer's own state says, not what _install shows)
+        (installer.currentState() as? InstallState.Installed)?.let { return@startInstall it }
         val file = File(paths.temp, "DBT3-MOBILE.iso")
         try {
             Net.download(ISO_URL, file) { done, total ->

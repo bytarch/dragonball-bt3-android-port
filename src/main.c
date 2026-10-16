@@ -60,9 +60,25 @@ extern void MainMenu_StartBallLoops(void); /* overlay load address: on the web a
 extern u8 MainMenu_StartBallLoops[]; /* overlay load address */
 #endif
 
+#ifdef _WIN32
+/* A release program (its data tables are its own file beside it: gPortDataStripped, plat_mem.c) starts only from
+ * the launcher, which passes BT3_LAUNCH: a double click on the game, or a copy of it in another folder, is
+ * refused. Nowhere else is there a launcher to pass it (the phone app starts the engine itself, the web build has
+ * no files), so this is Windows-only and a developer's own build is not affected. */
+extern volatile uint32_t gPortDataStripped;
+#include <stdio.h>
+#include <stdlib.h>
+#endif
+
 /* Program entry called by crt0: runs the game, which never returns. (The compiler adds the call to __main, the static
  * constructor runner, by itself.) */
 s32 main(void) {
+#ifdef _WIN32
+    if (gPortDataStripped == 1 && getenv("BT3_LAUNCH") == NULL) {
+        fprintf(stderr, "This is the game's own program. Start DBT3 instead: it is the launcher, in this folder.\n");
+        return 1;
+    }
+#endif
     Game_Main();
     return 0;
 }

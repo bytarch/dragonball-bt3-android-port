@@ -26,6 +26,23 @@
     <string name="iso_dl_confirm">This downloads 2.8 GB and needs about 3 GB of free space while it runs. On mobile data, that comes out of your data plan.</string>
     <string name="iso_dl_start">Download</string>
     <string name="iso_dl_step">Downloading the game ISO</string>
+
+    <string name="boot_files">Checking storage</string>
+    <string name="boot_data">Checking game data</string>
+    <string name="boot_engine">Starting the engine</string>
+    <string name="boot_server">Connecting to the server</string>
+    <string name="boot_version">Checking for a new build</string>
+    <string name="boot_free">%1$s free</string>
+    <string name="boot_no_storage">Storage is not writable</string>
+    <string name="boot_no_data">Not installed yet</string>
+    <string name="boot_no_engine">Engine not in this build</string>
+    <string name="boot_ready">Ready</string>
+    <string name="boot_online">Online</string>
+    <string name="boot_offline">Offline — playing the installed build</string>
+    <string name="boot_up_to_date">Up to date</string>
+    <string name="boot_new_build">Build %1$s is ready</string>
+    <string name="boot_build">Build %1$s (%2$d)</string>
+    <string name="boot_please_wait">Please wait…</string>
     <string name="err_iso_download">The game ISO could not be downloaded: %1$s</string>
     <string name="game_data_ok">USA release verified · %1$d files · %2$s</string>
     <string name="game_data_ok_mod">Modified image · %1$d files · %2$s</string>

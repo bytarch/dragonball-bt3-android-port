@@ -1,31 +1,49 @@
 #!/usr/bin/env python3
-"""Makes the release folder and zip: the finished port without any game data, plus the setup window.
+"""Makes the release folder and zip: the launcher, the finished port without any game data, and no game data.
 
-    BT3_CC=clang64 python3 port/tools/undefined.py && BT3_CC=clang64 python3 port/tools/link.py
-    port/setup/build.sh
-    python3 port/tools/package.py          -> port/build/release/ and port/build/DBT3-linux-x64.zip
-    BT3_CC=win64 python3 port/tools/package.py   (after the win64 build and `port/setup/build.sh win`)
-                                           -> port/build/release-win/ and port/build/DBT3-windows-x64.zip
+   BT3_CC=clang64 python3 port/tools/undefined.py && BT3_CC=clang64 python3 port/tools/link.py
+   port/setup/build.sh
+   python3 port/tools/package.py          -> port/build/release/ and port/build/DBT3-linux-x64.zip
+   BT3_CC=win64 python3 port/tools/package.py   (after the win64 build and `port/setup/build.sh win`)
+                                          -> port/build/release-win/ and port/build/DBT3-windows-x64.zip
 
-Contents:  DBT3, DBT3.dat   the game without the data tables of the original programs (strip_data.py)
-           DBT3-setup       the setup window: reads the user's own disc image and unpacks it into gamedata/
-           lib/            SDL3, so that it does not have to be installed
-           README.txt, licenses/
+Contents:  DBT3               the launcher: the one program a player starts. It checks the build at start, sets the
+                              game up from the user's own disc image (or from the project server) and plays it
+   DBT3-game, .mem, .dat      the game, without the data tables of the original programs (strip_data.py). On Windows
+                              it only starts through the launcher (BT3_LAUNCH, src/main.c)
+   lib/                       SDL3, so that it does not have to be installed
+   README.txt, licenses/
 The user needs nothing but their disc image. Nothing from the disc is in the zip."""
 import os, pathlib, re, shutil, subprocess, sys, zipfile
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-NAME = "DBT3"  # the program's name in a release: NAME, NAME.dat, NAME-setup
+NAME = "DBT3"  # the launcher, and the name a release carries on its window
+GAME = "DBT3-game"  # the program the launcher plays, with its data list: GAME, GAME.exe, GAME.dat, GAME.mem
 OUT = ROOT / "port/build/release"
 ZIP = ROOT / "port/build/DBT3-linux-x64.zip"
 
+
+def version_text():
+    """The version this release carries, written next to the program as version.txt: the setup window's boot screen
+    compares it with the newest build the server names (the tag it was built from: v1.2.3, win-v1.2.3)."""
+    try:
+        tag = subprocess.run(["git", "describe", "--tags", "--abbrev=0", "--match", "*v[0-9]*"], capture_output=True, text=True,
+                             cwd=ROOT).stdout.strip()
+    except OSError:
+        tag = ""  # no git in the build image: the boot screen then only names the server's build
+    return tag[4:] if tag.startswith("win-") else tag.lstrip("v") or "0.0.0"
+
 README = """Dragon Ball Z: Budokai Tenkaichi 3 - PC port (Linux, 64-bit)
 
-1. Start  DBT3-setup
-2. Choose your own disc image of the USA release (SLUS-21678), an .iso file.
+1. Start  DBT3   (the launcher: the only program to start)
+2. Choose your own disc image of the USA release (SLUS-21678), an .iso file, or press Download
+   to get it from the project server (Windows, 2.8 GB, deleted once it has been unpacked).
    The setup checks it and unpacks the game's data next to this file. About 4 GB are needed.
-3. Press Play. Later, start  DBT3  itself (or the setup again, and press Play).
+3. Press Play. Later, start  DBT3  again and press Play.
+
+The game (DBT3-game) starts only from the launcher. If you start it yourself it says so and stops: it is what the
+launcher does that keeps the game's data the one this release was made for.
 
 In the game, F1 opens the settings: resolution, widescreen, controls and sound.
 Saves are kept in saves/. A file placed in gamedata/mods/<same path as the original> replaces the original.
@@ -35,8 +53,7 @@ stages/ and songs/: see the note in each folder.
 This package contains no game data. The game's data comes from your disc and stays on your computer.
 """
 
-WIN_README = README.replace("(Linux, 64-bit)", "(Windows, 64-bit)").replace("Start  DBT3-setup\n", "Start  DBT3-setup.exe\n") \
-    .replace("start  DBT3  itself", "start  DBT3.exe  itself")
+WIN_README = README.replace("(Linux, 64-bit)", "(Windows, 64-bit)").replace("Start  DBT3  ", "Start  DBT3.exe  ")
 
 TEXTURES_NOTE = """Texture packs go here.
 
@@ -75,7 +92,7 @@ def take_program(exe, out):
     tables (port/data) is that already; one built with the tables' values has them taken out by strip_data.py."""
     import toolchain
     out.mkdir(parents=True)
-    name = NAME + ".exe" if exe.suffix == ".exe" else NAME
+    name = GAME + ".exe" if exe.suffix == ".exe" else GAME
     # where the game's own variables lie in the program (make_state.py, at link time): the program reads it from
     # beside itself to save and restore its state, which an online session is built on
     mem = pathlib.Path(str(exe) + ".mem")
@@ -87,7 +104,7 @@ def take_program(exe, out):
         if not dat.exists():
             sys.exit(f"missing {dat.name}: link.py makes it")
         shutil.copy2(exe, out / name)
-        shutil.copy2(dat, out / (NAME + ".dat"))
+        shutil.copy2(dat, out / (GAME + ".dat"))
         print("program built from the blank data tables (no disc involved)")
         return
     r = subprocess.run([sys.executable, str(ROOT / "port/tools/strip_data.py"), "--exe", str(exe), "--out", str(out)], capture_output=True, text=True)
@@ -95,7 +112,7 @@ def take_program(exe, out):
     if r.returncode or "NOT matched" in r.stdout:
         sys.exit("strip_data.py failed or left game data in the program: not packaging\n" + r.stderr)
     (out / ("bt3.exe" if exe.suffix == ".exe" else "bt3")).rename(out / name)  # strip_data.py writes bt3 and bt3.dat
-    (out / "bt3.dat").rename(out / (NAME + ".dat"))
+    (out / "bt3.dat").rename(out / (GAME + ".dat"))
 
 def bundle_sdl_dependencies(dll, out, lic, prefix):
     """MSYS2 SDL can import libiconv; the official SDL archive is self-contained.
@@ -123,10 +140,10 @@ def bundle_sdl_dependencies(dll, out, lic, prefix):
             "MSYS2 build recipe: https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-libiconv\n")
 
 def main_win():
-    """BT3_CC=win64: bt3.exe (cross-built or built in MSYS2), DBT3-setup.exe (port/setup/build.sh win), SDL3.dll."""
+    """BT3_CC=win64: bt3.exe (cross-built or built in MSYS2), DBT3-launcher.exe (port/setup/build.sh win), SDL3.dll."""
     import toolchain
     out, zpath = ROOT / "port/build/release-win", ROOT / "port/build/DBT3-windows-x64.zip"
-    exe, setup = ROOT / "port/build/bt3.exe", ROOT / "port/build/DBT3-setup.exe"
+    exe, setup = ROOT / "port/build/bt3.exe", ROOT / "port/build/DBT3-launcher.exe"
     dll = next((p for p in [toolchain.sdl3() / "bin/SDL3.dll"] if p.exists()), None) if toolchain.sdl3() else None
     if dll is None:
         dll = next((pathlib.Path(d) / "SDL3.dll" for d in os.environ.get("PATH", "").split(os.pathsep) if (pathlib.Path(d) / "SDL3.dll").exists()), None)
@@ -138,8 +155,10 @@ def main_win():
     if out.exists():
         shutil.rmtree(out)
     take_program(exe, out)
-    shutil.copy2(setup, out / "DBT3-setup.exe")
+    shutil.copy2(setup, out / (NAME + ".exe"))
     shutil.copy2(dll, out / "SDL3.dll")
+    shutil.copy2(ROOT / "port/res/boot_backdrop.jpg", out / "boot_backdrop.jpg")  # the launcher's boot screen
+    (out / "version.txt").write_text(version_text())  # what the boot screen compares the server's build against
     (out / "README.txt").write_text(WIN_README.replace("\n", "\r\n"))
     lic = out / "licenses"
     lic.mkdir()
@@ -153,7 +172,7 @@ def main_win():
         (out / kind).mkdir()
         (out / kind / "README.txt").write_text(note.replace("\n", "\r\n"))
     (lic / "sdl3.txt").write_text("SDL3 (SDL3.dll) is distributed under the zlib license: https://www.libsdl.org/license.php\n")
-    for f in (out / "DBT3.exe", out / "DBT3-setup.exe"):
+    for f in (out / (NAME + ".exe"), out / (GAME + ".exe")):
         subprocess.run([toolchain.PREFIX + "strip", "--strip-debug", str(f)], check=False)
     if zpath.exists():
         zpath.unlink()
@@ -168,14 +187,16 @@ def main_win():
 
 def main():
     exe = ROOT / "port/build/bt3_64"
-    setup = ROOT / "DBT3-setup"
+    setup = ROOT / "port/build/DBT3-launcher"
     for need in (exe, setup, pathlib.Path(str(exe) + ".map")):
         if not need.exists():
             sys.exit(f"missing {need.relative_to(ROOT)}: build first (see the top of this file)")
     if OUT.exists():
         shutil.rmtree(OUT)
     take_program(exe, OUT)
-    shutil.copy2(setup, OUT / "DBT3-setup")
+    shutil.copy2(setup, OUT / NAME)
+    shutil.copy2(ROOT / "port/res/boot_backdrop.jpg", OUT / "boot_backdrop.jpg")  # the launcher's boot screen
+    (OUT / "version.txt").write_text(version_text())
     (OUT / "lib").mkdir()
     lib = next((p for d in ("/usr/local/lib", "/usr/lib", "/usr/lib64", "/usr/lib/x86_64-linux-gnu") for p in sorted(pathlib.Path(d).glob("libSDL3.so.0"))), None)
     if lib is None:
@@ -193,7 +214,7 @@ def main():
         (OUT / kind).mkdir()
         (OUT / kind / "README.txt").write_text(note)
     (lic / "sdl3.txt").write_text("SDL3 (lib/libSDL3.so.0) is distributed under the zlib license: https://www.libsdl.org/license.php\n")
-    for f in (OUT / "DBT3", OUT / "DBT3-setup"):
+    for f in (OUT / NAME, OUT / GAME):
         subprocess.run(["strip", "--strip-debug", str(f)], check=False)  # the symbol names stay (crash reports use them)
     if ZIP.exists():
         ZIP.unlink()
@@ -213,7 +234,7 @@ def portable(out):
     """Says whether the release would run on other people's machines: no CPU level above the baseline demanded
     or used, and no newer C library than Ubuntu 22.04's (2.35). Build with port/release/build_linux.sh to pass."""
     bad = []
-    for f in ("DBT3", "DBT3-setup", "lib/libSDL3.so.0"):
+    for f in (NAME, GAME, "lib/libSDL3.so.0"):
         note = subprocess.run(["readelf", "-n", str(out / f)], capture_output=True, text=True).stdout
         need = next((l.split(":", 1)[1].strip() for l in note.splitlines() if "ISA needed" in l), "")
         if any(v in need for v in ("x86-64-v2", "x86-64-v3", "x86-64-v4")):

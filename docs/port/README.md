@@ -1101,8 +1101,9 @@ Rule: release zips come from `port/release/build_linux.sh` (and the mingw cross-
 
 ## Names (2026-10-06)
 
-In a release the program is `DBT3` (`.exe` on Windows) with `DBT3.dat`, the setup is
-`DBT3-setup`, the archives are `DBT3-linux-x64.zip` / `-windows-x64.zip` with a top folder
+In a release the launcher is `DBT3` (`.exe` on Windows) — the one program a player starts — the game it
+plays is `DBT3-game` with `DBT3-game.dat` and `DBT3-game.mem` (the engine finds its list from its own name,
+`plat_mem.c`), the archives are `DBT3-linux-x64.zip` / `-windows-x64.zip` with a top folder
 `DBT3/`, and both windows carry that name in their title (it used to be the repository's name,
 `Tenkaichi3Decomp`). The executable carries the phone app's icon and its name in the file
 properties (`port/res/dbt3.rc`, painted by `port/tools/make_icon.py`). Inside the build the programs are still
@@ -1114,6 +1115,11 @@ properties (`port/res/dbt3.rc`, painted by `port/tools/make_icon.py`). Inside th
   program's folder (data, saves, settings). `BT3_GS=none` means no renderer; the setup's self-test and install.py
   set it. A developer's build (data linked in) still draws nothing by default. Checked: the Linux release
   started from `/` with nothing set opens the window and writes its files next to itself.
+- **Started only by the launcher (Windows):** a release game program also needs `BT3_LAUNCH` in its environment, or
+  it prints one line and stops (`src/main.c`, `#ifdef _WIN32`, and only when `gPortDataStripped` = 1). The launcher
+  sets it when it plays (`setup.cpp`) and in the install's self-test (`native.cpp`). Nothing on the player's own
+  machine can be made unbypassable — this stops a double click and a stray copy, not someone who patches the
+  program; the data list's checksum (`plat_mem.c`) is what catches a program that has been changed.
 
 ## First run on real Windows, and the getenv cost (2026-10-06)
 

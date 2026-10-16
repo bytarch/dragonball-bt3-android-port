@@ -1,15 +1,14 @@
-// The setup window of the PC port: pick your disc image, watch the steps, press Play.
-//
-// A small native program (SDL3 + Dear ImGui, the same library and look as the game's F1 settings window). It does
+// The setup window: the launcher's own window, and the launcher's name is the one in a release (DBT3). It does
 // none of the work itself: it runs `python3 install.py --machine --iso <file>` next to it and shows the events
 // that script prints (one line each: @step, @note, @ok, @skip, @fail, @missing, @stopped, @done; see install.py).
 //
-//   build:  port/setup/build.sh   ->  ./DBT3-setup
+//   build:  port/setup/build.sh   ->  ./DBT3
 //   test:   BT3_SETUP_ISO=<file> starts the installation at once; BT3_SETUP_SHOT=<prefix> writes the window's
 //           picture to <prefix>_<n>.ppm whenever the page or the step changes (no person needed to check it)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <math.h>
 #include <mutex>
 #include <string>
@@ -21,10 +20,18 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_opengl3_loader.h" // glViewport, glClear for the OpenGL window (set up by ImGui_ImplOpenGL3_Init)
 #include "native.h"
+#include "net.h"
 
-#define GAME "DBT3" /* the program this sets up: GAME, GAME.dat; this program is GAME-setup */
+#define LAUNCH "DBT3"      /* this program: the launcher, and the one a player starts */
+#define GAME "DBT3-game"   /* the program it launches: GAME, GAME.exe, GAME.dat (the engine's list is named after
+                            * the program it belongs to, so these three names always travel together) */
 
-enum Page { PAGE_PICK, PAGE_RUN, PAGE_DONE, PAGE_FAILED };
+// The project's own server: the disc image to set the game up from, and the build feed read at every start.
+#define kIsoUrl "https://gcode.bytarch.com/DBT3-MOBILE.iso"
+#define kFeedUrl "https://gcode.bytarch.com/version.json"
+#define kBootBackdrop "boot_backdrop.jpg" /* next to this program (port/res/boot_backdrop.jpg) */
+
+enum Page { PAGE_BOOT, PAGE_PICK, PAGE_RUN, PAGE_DONE, PAGE_FAILED };
 enum State { PENDING, RUNNING, OK, SKIPPED, FAILED };
 struct StepRow { std::string title, detail; State state = PENDING; Uint64 start = 0, end = 0; };
 struct Missing { std::string name, why, pkg; };
@@ -55,7 +62,7 @@ static SDL_GPUDevice *sDevice;
 // BT3_GPU_API=gl asks for OpenGL at once, as it does for the game.
 static SDL_GLContext sGl;
 static bool sUseGl;
-static Page sPage = PAGE_PICK;
+static Page sPage = PAGE_BOOT;
 static char sIso[1024];
 static std::string sRoot, sError, sLauncher, sLine;
 static std::vector<StepRow> sRows;
@@ -88,6 +95,203 @@ static std::string find_root() {
         dir += "../";
     }
     return "";
+}
+
+// -------------------------------------------------------------------------------------------------- the boot
+
+static void reset_rows(void);     // defined with the install pages below
+static void step_list(const std::vector<StepRow> &rows);
+
+// What a player sees between double-clicking this program and the page they came for: the artwork, the build, and
+// each check as it lands. The same list every time is what makes it read like a game's loading step.
+static const char *kBootSteps[] = {"Storage", "Game data", "Game", "Server", "Build"};
+static std::vector<StepRow> sBoot;
+static int sBootStep = 0;      // the step at work; sBootStep == the number of steps means it is over
+static Uint64 sBootStart;
+static Feed sFeed;
+static bool sIsoDownloaded;     // the image on disk is ours: it is deleted once it has been unpacked
+static std::string sVersion;    // this program's own version, from version.txt next to it
+static ImTextureID sBackdrop;
+
+// version.txt next to this program (written by package.py from the tag the release was built from). Without it the
+// build check says so rather than claiming an update that is not there.
+static void read_version() {
+    FILE *fp = fopen((sRoot + "version.txt").c_str(), "rb");
+    if (fp == NULL) {
+        return;
+    }
+    char buf[64] = "";
+    if (fgets(buf, sizeof(buf), fp) != NULL) {
+        sVersion = buf;
+        while (!sVersion.empty() && (sVersion[sVersion.size() - 1] == '\n' || sVersion[sVersion.size() - 1] == '\r' ||
+                                     sVersion[sVersion.size() - 1] == ' ')) {
+            sVersion.resize(sVersion.size() - 1);
+        }
+    }
+    fclose(fp);
+}
+
+// 0.5.0 -> 500, the same number the Android build puts in its version code, so one build feed serves both.
+static long long version_code(const std::string &v) {
+    long long out = 0;
+    size_t i = 0;
+    for (int part = 0; part < 3; part++) {
+        size_t start = i;
+        while (i < v.size() && v[i] >= '0' && v[i] <= '9') {
+            i++;
+        }
+        if (i == start) {
+            return -1;
+        }
+        out = out * 100 + atoi(v.substr(start, i - start).c_str());
+        if (i < v.size() && v[i] == '.') {
+            i++;
+        }
+    }
+    return out;
+}
+
+static void boot_begin() {
+    sBoot.assign(sizeof(kBootSteps) / sizeof(kBootSteps[0]), StepRow());
+    for (size_t i = 0; i < sBoot.size(); i++) {
+        sBoot[i].title = kBootSteps[i];
+    }
+    sBootStep = 0;
+    sBootStart = SDL_GetTicks();
+    sBoot[0].state = RUNNING;
+}
+
+// One step per frame: a game never hangs on one, and the window keeps drawing and closing.
+static void boot_tick(void) {
+    if (sPage != PAGE_BOOT || sBootStep >= (int)sBoot.size()) {
+        return;
+    }
+    StepRow &r = sBoot[sBootStep];
+    switch (sBootStep) {
+    case 0: { // the folder everything is written to has to be there and have room for the game
+        std::string dir = sRoot.empty() ? std::string(".") : sRoot;
+        bool writable = SDL_GetPathInfo(dir.c_str(), NULL);
+        r.detail = writable ? "ready" : "not writable";
+        r.state = writable ? OK : FAILED;
+        break;
+    }
+    case 1: { // the unpacked data, the same marker native.cpp leaves behind
+        if (!sRoot.empty() && Native_Installed(sRoot)) {
+            r.detail = "already unpacked";
+            r.state = OK;
+        } else {
+            r.detail = "not installed yet";
+            r.state = SKIPPED;
+        }
+        break;
+    }
+    case 2: // the finished program this window sets up (DBT3 and DBT3.dat)
+        r.detail = sRelease ? "ready" : "source checkout";
+        r.state = sRelease ? OK : SKIPPED;
+        break;
+    case 3: // the server, and with it the newest build: no connection is not fatal, the game is all local
+        sFeed = Net_Feed(kFeedUrl);
+        r.detail = sFeed.ok ? "online" : sFeed.error.empty() ? "offline" : sFeed.error;
+        r.state = sFeed.ok ? OK : SKIPPED;
+        break;
+    default: { // is this the newest build?
+        long long mine = version_code(sVersion), theirs = version_code(sFeed.version);
+        if (!sFeed.ok) {
+            r.detail = "not checked";
+            r.state = SKIPPED;
+        } else if (sVersion.empty()) {
+            r.detail = "server build " + sFeed.version; // this copy carries no version.txt (see read_version)
+            r.state = SKIPPED;
+        } else {
+            r.detail = theirs > mine ? "build " + sFeed.version + " is out" : "up to date (" + sVersion + ")";
+            r.state = OK;
+            // ponytail: no button to fetch it yet — one SDL_OpenURL(apk_url) on the next page when you want it
+        }
+        break;
+    }
+    }
+    r.end = SDL_GetTicks();
+    sBootStep++;
+    if (sBootStep < (int)sBoot.size()) {
+        sBoot[sBootStep].state = RUNNING;
+        return;
+    }
+    // never a flash of a page the player cannot read (and never a frozen window while it waits: it is a gate, not a
+    // sleep)
+    if (SDL_GetTicks() - sBootStart < 1400) {
+        return;
+    }
+    sPage = sRelease && !sRoot.empty() && Native_Installed(sRoot) ? PAGE_DONE : PAGE_PICK;
+    if (sPage == PAGE_DONE) {
+        reset_rows();
+        for (auto &row : sRows) {
+            row.state = SKIPPED;
+            row.detail = "already done";
+        }
+        sLauncher = sRoot + (file_exists((sRoot + GAME ".exe").c_str()) ? GAME ".exe" : GAME);
+    }
+}
+
+// The picture on the boot page, as a texture for whichever backend is drawing. Loaded once, kept until the end.
+static void load_backdrop(void) {
+    Image img = Img_Load(sRoot + kBootBackdrop);
+    if (img.rgba == NULL) {
+        return;
+    }
+    if (sUseGl) {
+        typedef void (*PFN_TEXIMAGE2D)(unsigned, int, int, int, int, int, unsigned, unsigned, const void *);
+        PFN_TEXIMAGE2D tex_image = (PFN_TEXIMAGE2D)SDL_GL_GetProcAddress("glTexImage2D");
+        GLuint tex = 0;
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        if (tex_image != NULL) {
+            tex_image(GL_TEXTURE_2D, 0, GL_RGBA, img.width, img.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba);
+        }
+        sBackdrop = (ImTextureID)(intptr_t)tex;
+    } else {
+        SDL_GPUTextureCreateInfo ci;
+        SDL_zero(ci);
+        ci.type = SDL_GPU_TEXTURETYPE_2D;
+        ci.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+        ci.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COPY_DST;
+        ci.width = img.width;
+        ci.height = img.height;
+        ci.layer_count_or_depth = 1;
+        ci.num_levels = 1;
+        SDL_GPUTexture *tex = SDL_CreateGPUTexture(sDevice, &ci);
+        if (tex != NULL) {
+            SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(sDevice);
+            SDL_GPUTransferBufferCreateInfo ti;
+            SDL_zero(ti);
+            ti.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+            ti.size = (Uint32)((size_t)img.width * img.height * 4);
+            SDL_GPUTransferBuffer *tb = SDL_CreateGPUTransferBuffer(sDevice, &ti);
+            if (tb == NULL) {
+                SDL_ReleaseGPUTexture(sDevice, tex);
+                Img_Free(img);
+                return;
+            }
+            void *mapped = SDL_MapGPUTransferBuffer(sDevice, tb, false);
+            if (mapped != NULL) {
+                memcpy(mapped, img.rgba, ti.size);
+            }
+            SDL_UnmapGPUTransferBuffer(sDevice, tb);
+            SDL_GPUTransferBufferRegion region;
+            SDL_zero(region);
+            region.transfer_buffer = tb;
+            region.offset = 0;
+            region.size = ti.size;
+            SDL_GPUCopyPass *cp = SDL_BeginGPUCopyPass(cmd);
+            SDL_UploadToGPUTexture(cp, &region, tex, NULL, 0);
+            SDL_EndGPUCopyPass(cp);
+            SDL_SubmitGPUCommandBuffer(cmd);
+            SDL_ReleaseGPUTransferBuffer(sDevice, tb);
+            sBackdrop = (ImTextureID)(intptr_t)tex;
+        }
+    }
+    Img_Free(img);
 }
 
 static void style() {
@@ -350,11 +554,73 @@ static void bottom_row(int buttons) {
     ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + avail.x - w, ImGui::GetCursorPosY() + avail.y - 40.0f));
 }
 
+static std::string human_bytes(long long n) {
+    char buf[64];
+    if (n >= 1LL << 30) {
+        snprintf(buf, sizeof(buf), "%.1f GB", n / (double)(1LL << 30));
+    } else if (n >= 1LL << 20) {
+        snprintf(buf, sizeof(buf), "%.0f MB", n / (double)(1LL << 20));
+    } else {
+        snprintf(buf, sizeof(buf), "%lld kB", n / 1024);
+    }
+    return buf;
+}
+
+// The image from the project's own server: it runs on a thread of its own (net.cpp) and is shown as the run page's
+// first step; when it is whole it is installed like an image the player picked, and then deleted.
+static bool sDownloading;
+static void pump_download(void) {
+    if (!sDownloading) {
+        return;
+    }
+    long long done = 0, total = 0;
+    bool running = false;
+    std::string error;
+    Dl_Poll(done, total, running, error);
+    StepRow &r = sRows[0];
+    r.state = RUNNING;
+    if (r.start == 0) {
+        r.start = SDL_GetTicks();
+    }
+    r.detail = total > 0 ? human_bytes(done) + " of " + human_bytes(total) : human_bytes(done);
+    if (running) {
+        return;
+    }
+    sDownloading = false;
+    r.end = SDL_GetTicks();
+    if (!error.empty()) {
+        r.state = FAILED;
+        sError = "The download did not finish: " + error + ".";
+        sPage = PAGE_FAILED;
+        return;
+    }
+    SDL_strlcpy(sIso, (sRoot + "DBT3-MOBILE.iso").c_str(), sizeof(sIso));
+    start_install(); // the rows start again: the image is unpacked into the game data now
+}
+
+static void page_boot(void) {
+    ImVec2 size = ImGui::GetIO().DisplaySize;
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    if (sBackdrop != NULL) {
+        dl->AddImage(sBackdrop, ImVec2(0.0f, 0.0f), size); // stretched over the window: a splash, not a picture frame
+        dl->AddRectFilled(ImVec2(0.0f, size.y * 0.30f), size, ImGui::GetColorU32(ImVec4(0.04f, 0.05f, 0.08f, 0.88f)));
+    }
+    heading(LAUNCH, sVersion.empty() ? "Getting the game ready" : ("Getting the game ready  ·  build " + sVersion).c_str());
+    step_list(sBoot);
+    int done = 0;
+    for (size_t i = 0; i < sBoot.size(); i++) {
+        done += sBoot[i].state != PENDING && sBoot[i].state != RUNNING;
+    }
+    ImGui::Dummy(ImVec2(0.0f, 4.0f));
+    ImGui::ProgressBar((float)done / (float)(sBoot.empty() ? 1 : sBoot.size()), ImVec2(-FLT_MIN, 8.0f), "");
+    ImGui::TextColored(kDim, "Please wait...");
+}
+
 static void page_pick() {
     static const SDL_DialogFileFilter filters[] = {{"PS2 disc image", "iso;bin;img"}, {"All files", "*"}};
     bool ok = file_exists(sIso);
 
-    heading(GAME, "This sets the game up on your computer from your own PlayStation 2 disc.");
+    heading(LAUNCH, "This sets the game up on your computer from your own PlayStation 2 disc.");
     ImGui::TextWrapped("Choose your disc image of Dragon Ball Z: Budokai Tenkaichi 3, USA release (SLUS-21678), as an .iso file. "
                        "The game's data is taken from it and stays on this computer. %s",
                        sRelease ? "Nothing is downloaded." : "Nothing is downloaded except one small tool.");
@@ -373,12 +639,28 @@ static void page_pick() {
     } else {
         ImGui::TextColored(kDim, sRelease ? "Needs about 4 GB of free space and takes a minute or two." : "Needs about 4 GB of free space and takes 5 to 10 minutes.");
     }
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+    ImGui::TextWrapped("Or take the image from the project server instead: 2.8 GB, and it is deleted once the game "
+                       "data is unpacked. Windows only (the Linux build links no HTTPS library).");
+    if (big_button("Download", false, !sRoot.empty() && !Dl_Active())) {
+        reset_rows();
+        std::string error;
+        if (Dl_Start(kIsoUrl, sRoot + "DBT3-MOBILE.iso", error)) {
+            sIsoDownloaded = true;
+            sDownloading = true;
+            sError.clear();
+            sPage = PAGE_RUN;
+        } else {
+            sError = error;
+        }
+    }
     bottom_row(2);
     if (big_button("Close", false)) {
         sQuit = true;
     }
     ImGui::SameLine();
     if (big_button("Install", true, ok && !sRoot.empty())) {
+        sIsoDownloaded = false; // the image being installed is the player's own now, never ours to delete
         start_install();
     }
 }
@@ -409,10 +691,10 @@ static void state_icon(State st, float t) {
     ImGui::Dummy(ImVec2(22.0f, 22.0f));
 }
 
-static void step_list() {
+static void step_list(const std::vector<StepRow> &rows) {
     float t = (float)SDL_GetTicks() / 1000.0f;
-    for (size_t i = 0; i < sRows.size(); i++) {
-        StepRow &r = sRows[i];
+    for (size_t i = 0; i < rows.size(); i++) {
+        StepRow &r = rows[i];
         char clock[32] = "";
         state_icon(r.state, t);
         ImGui::SameLine(0.0f, 14.0f);
@@ -436,8 +718,10 @@ static void step_list() {
 
 static void page_run() {
     int done = 0;
-    heading("Setting up", "You can leave this running. Finished steps are kept if it is interrupted.");
-    step_list();
+    heading(sDownloading ? "Downloading" : "Setting up",
+            sDownloading ? "You can leave this running; Cancel stops it and a part-downloaded image is deleted."
+                         : "You can leave this running. Finished steps are kept if it is interrupted.");
+    step_list(sRows);
     for (auto &r : sRows) {
         done += r.state == OK || r.state == SKIPPED;
     }
@@ -445,11 +729,20 @@ static void page_run() {
     ImGui::ProgressBar((float)done / (float)(sRows.empty() ? 1 : sRows.size()), ImVec2(-FLT_MIN, 8.0f), "");
     bottom_row(1);
     if (big_button("Cancel", false)) {
-        if (sProc != NULL) {
+        if (sDownloading) {
+            Dl_Cancel();
+            sDownloading = false;
+            sIsoDownloaded = false; // nothing of ours stays on disk: the worker deletes its part-downloaded image
+            SDL_strlcpy(sIso, "", sizeof(sIso));
+            sPage = PAGE_PICK;
+        } else if (sProc != NULL) {
             SDL_KillProcess(sProc, false);
+            Native_Cancel();
+            sError = "Cancelled. Finished steps are kept; Install continues from where it stopped.";
+        } else {
+            Native_Cancel();
+            sError = "Cancelled. Finished steps are kept; Install continues from where it stopped.";
         }
-        Native_Cancel();
-        sError = "Cancelled. Finished steps are kept; Install continues from where it stopped.";
     }
 }
 
@@ -462,7 +755,7 @@ static void page_done() {
         snprintf(sub, sizeof(sub), "The game is installed.");
     }
     heading("Ready to play", sub);
-    step_list();
+    step_list(sRows);
     ImGui::Dummy(ImVec2(0.0f, 4.0f));
     ImGui::TextColored(kDim, "In the game, F1 opens the settings: resolution, widescreen, controls and sound.");
     bottom_row(2);
@@ -475,6 +768,7 @@ static void page_done() {
         SDL_PropertiesID props = SDL_CreateProperties();
         SDL_Environment *env = SDL_CreateEnvironment(true);
         SDL_SetEnvironmentVariable(env, "BT3_GS", "gpu", true); // the window and the GPU renderer
+        SDL_SetEnvironmentVariable(env, "BT3_LAUNCH", "1", true); // a release game only starts from here (see src/main.c)
         SDL_UnsetEnvironmentVariable(env, "BT3_DEMO");
         SDL_UnsetEnvironmentVariable(env, "BT3_REPLAY");
         SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void *)args);
@@ -529,14 +823,21 @@ static void build_ui() {
     ImGuiIO &io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(io.DisplaySize);
+    if (sPage == PAGE_BOOT) {
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // the artwork shows through
+    }
     ImGui::Begin("setup", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
     switch (sPage) {
+    case PAGE_BOOT: page_boot(); break;
     case PAGE_PICK: page_pick(); break;
     case PAGE_RUN: page_run(); break;
     case PAGE_DONE: page_done(); break;
     case PAGE_FAILED: page_failed(); break;
     }
     ImGui::End();
+    if (sPage == PAGE_BOOT) {
+        ImGui::PopStyleColor();
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------- the window
@@ -613,13 +914,13 @@ int main(int argc, char **argv) {
     int shots = 0, shotKey = -1;
 
     if (argc > 2 && strcmp(argv[1], "--install") == 0) {
-        // Without a window: DBT3-setup --install <disc.iso>. A release folder only; prints the event lines.
+        // Without a window: DBT3 --install <disc.iso>. A release folder only; prints the event lines.
         std::string line;
         bool ok = false;
         SDL_Init(0);
         sRoot = find_root();
         if (!sRelease) {
-            fprintf(stderr, GAME "-setup --install works in a release folder (" GAME " and " GAME ".dat next to it).\nIn a source checkout: python3 install.py --iso <file>\n");
+            fprintf(stderr, LAUNCH " --install works in a release folder (" GAME ", " GAME ".dat next to it).\nIn a source checkout: python3 install.py --iso <file>\n");
             return 2;
         }
         Native_Start(sRoot, argv[2]);
@@ -636,7 +937,7 @@ int main(int argc, char **argv) {
         return ok ? 0 : 1;
     }
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        fprintf(stderr, GAME "-setup: %s\n", SDL_GetError());
+        fprintf(stderr, LAUNCH ": %s\n", SDL_GetError());
         return 1;
     }
     const char *glsl = "#version 330";
@@ -645,7 +946,7 @@ int main(int argc, char **argv) {
         bool wantGl = api != NULL && (strcmp(api, "gl") == 0 || strcmp(api, "opengl") == 0);
         std::string why;
         if (!wantGl) {
-            sWindow = SDL_CreateWindow(GAME " - Setup", 760, 560, SDL_WINDOW_HIGH_PIXEL_DENSITY);
+            sWindow = SDL_CreateWindow(LAUNCH, 760, 560, SDL_WINDOW_HIGH_PIXEL_DENSITY);
             sDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL, false, NULL);
             if (sWindow == NULL || sDevice == NULL || !SDL_ClaimWindowForGPUDevice(sDevice, sWindow)) {
                 why = SDL_GetError();
@@ -668,7 +969,7 @@ int main(int argc, char **argv) {
                 SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, attempt == 0 ? SDL_GL_CONTEXT_PROFILE_CORE : 0);
                 SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
                 glsl = attempt == 0 ? "#version 330" : "#version 130";
-                sWindow = SDL_CreateWindow(GAME " - Setup", 760, 560, SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_OPENGL);
+                sWindow = SDL_CreateWindow(LAUNCH, 760, 560, SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_OPENGL);
                 sGl = sWindow != NULL ? SDL_GL_CreateContext(sWindow) : NULL;
                 if (sGl == NULL && sWindow != NULL) {
                     SDL_DestroyWindow(sWindow);
@@ -676,12 +977,12 @@ int main(int argc, char **argv) {
                 }
             }
             if (sGl == NULL) {
-                fprintf(stderr, GAME "-setup: no window: %s%s%s\nThe same setup runs without a window: " GAME "-setup --install <disc image>\n",
+                fprintf(stderr, LAUNCH ": no window: %s%s%s\nThe same setup runs without a window: " LAUNCH " --install <disc image>\n",
                         why.c_str(), why.empty() ? "" : "; OpenGL: ", SDL_GetError());
                 return 1;
             }
             if (!wantGl) {
-                fprintf(stderr, GAME "-setup: %s; the window uses OpenGL\n", why.c_str());
+                fprintf(stderr, LAUNCH ": %s; the window uses OpenGL\n", why.c_str());
             }
             SDL_GL_MakeCurrent(sWindow, sGl);
             SDL_GL_SetSwapInterval(1);
@@ -712,15 +1013,7 @@ int main(int argc, char **argv) {
         ImGui_ImplSDLGPU3_Init(&info);
     }
     sRoot = find_root();
-    if (sRelease && Native_Installed(sRoot) && getenv("BT3_SETUP_ISO") == NULL) { // nothing left to do: offer Play
-        reset_rows();
-        for (auto &r : sRows) {
-            r.state = SKIPPED;
-            r.detail = "already done";
-        }
-        sLauncher = sRoot + (file_exists((sRoot + GAME ".exe").c_str()) ? GAME ".exe" : GAME);
-        sPage = PAGE_DONE;
-    }
+    read_version();
     if (argc > 1) {
         SDL_strlcpy(sIso, argv[1], sizeof(sIso));
     }
@@ -729,6 +1022,9 @@ int main(int argc, char **argv) {
         if (!sRoot.empty() && file_exists(sIso)) {
             start_install();
         }
+    } else {
+        load_backdrop(); // the window and its renderer are ready by now
+        boot_begin();
     }
     while (!sQuit) {
         SDL_Event ev;
@@ -747,7 +1043,13 @@ int main(int argc, char **argv) {
                 sDialogReady = false;
             }
         }
+        boot_tick();
+        pump_download();
         pump_install();
+        if (sPage == PAGE_DONE && sIsoDownloaded) { // the image has been unpacked: only the game data is needed now
+            remove(sIso);
+            sIsoDownloaded = false;
+        }
         if (sUseGl) {
             ImGui_ImplOpenGL3_NewFrame();
         } else {
@@ -824,6 +1126,7 @@ int main(int argc, char **argv) {
         SDL_DestroyProcess(sProc);
     }
     Native_Join();
+    Dl_Join(); // a download that is still running is cancelled and waited for before the window goes
     if (sUseGl) {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
