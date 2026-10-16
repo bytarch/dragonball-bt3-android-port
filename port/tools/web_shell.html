@@ -18,10 +18,14 @@
 <canvas id="canvas" tabindex="-1"></canvas>
 <script>
   var status = document.getElementById('status');
-  /* The disc image the engine reads (port/tools/webdata.js): the deployment's own URL; ?data=URL overrides. */
+  /* web.py copies this shell with __BT3_BUILD__ set to the build's run number (a local build: the time), so
+     the references below get ?v=N: a served set of html/js/wasm of one build can't be mixed with another's
+     caches. The disc image the engine reads (port/tools/webdata.js) is Module.dataUrl; ?data=URL overrides. */
+  var BT3_BUILD = '__BT3_BUILD__';
   var dataUrl = new URLSearchParams(location.search).get('data') || 'https://gcode.bytarch.com/DBT3-MOBILE.iso';
   var Module = {
     dataUrl: dataUrl,
+    locateFile: function (f) { return f + '?v=' + BT3_BUILD; },
     canvas: document.getElementById('canvas'),
     print: function (t) { status.textContent += '\n' + t; },
     printErr: function (t) { status.textContent += '\n' + t; },

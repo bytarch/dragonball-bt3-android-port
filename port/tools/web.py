@@ -32,7 +32,7 @@ Environment (as android.py):
     BT3_JOBS     parallel compiles (default: the number of processors)
     BT3_SKELETON 1: the game's data tables blank (always for a release); else port/build/gen/data
 """
-import concurrent.futures, os, pathlib, re, shutil, subprocess, sys
+import concurrent.futures, os, pathlib, re, shutil, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -52,6 +52,18 @@ import portsrc, eeconst  # noqa: E402
 
 def run(cmd, **kw):
     return subprocess.run([str(c) for c in cmd], cwd=ROOT, capture_output=True, text=True, **kw)
+
+
+def build_stamp():
+    """The build's own number (CI's run number; a local build: the time): package() names the files after
+    it and the shell's ?v= reference in html and the wasm path carry it, so one build's files cannot be
+    mixed with another build's caches."""
+    global BUILD_STAMP
+    if BUILD_STAMP is None:
+        BUILD_STAMP = os.environ.get("GITHUB_RUN_NUMBER") or str(int(time.time()))
+    return BUILD_STAMP
+
+BUILD_STAMP = None
 
 
 def soft_float():
@@ -309,13 +321,18 @@ def link():
                                 "-sSTACK_SIZE=8MB", "-sFULL_ES3=1", "-sMAX_WEBGL_VERSION=2", "-sMIN_WEBGL_VERSION=2",
                                 "-sGL_ENABLE_GET_PROC_ADDRESS=1", "-sEXIT_RUNTIME=0", "-sASSERTIONS=1",
                                 "-sEXPORTED_FUNCTIONS=_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",
-                                "--no-entry", "--shell-file", str(HERE / "web_shell.html"),
+                                "--no-entry", "--shell-file", str(stamped),
                                 # the file layer: port/tools/webdata.js, and the async reads it makes possible
                                 "--js-library", str(HERE / "webdata.js"), "-sASYNCIFY=1",
                                 f"-I{SDL3 / 'include'}", f"-L{SDL3 / 'lib'}", "-lSDL3",
                                 "-Wl,--wrap=Progress_Main"] + sdl3_link_flags() + extra
 
     DIST.mkdir(parents=True, exist_ok=True)
+    # the shell gets its build stamp here: the same number packages the files under (below), so the served
+    # references and the engine's wasm file name agree (a mixed set of builds is an import-table error)
+    stamped = GEN / "bt3_shell.html"
+    stamped.parent.mkdir(parents=True, exist_ok=True)
+    stamped.write_text((HERE / "web_shell.html").read_text().replace("__BT3_BUILD__", build_stamp()))
     extra, typed, stubbed, need = [], set(), set(), []
     for i in range(20):
         r = run(link_cmd(extra))
@@ -364,9 +381,16 @@ def package():
         if not (DIST / f).exists():
             print("missing", f)
             return False
-    # the version the deploy carries. A whole artifact is one unit — html/js/wasm must be from the same
-    # build (a mixed set is an import-table error) — so it is served from a folder named for the build.
-    stamp = os.environ.get("GITHUB_RUN_NUMBER") or "dev"
+    # the build's files carry ITS number (a whole artifact is one unit; a mixed set is an import error and
+    # a stale cache mix looks identical to one on the browser side): named bt3-<stamp>.{js,wasm}, and the
+    # html's script tag follows (the wasm name the engine asks for follows it through locateFile).
+    stamp = build_stamp()
+    tag = f"bt3-{stamp}"
+    shutil.move(DIST / "bt3.js", DIST / (tag + ".js"))
+    shutil.move(DIST / "bt3.wasm", DIST / (tag + ".wasm"))
+    html = (DIST / "bt3.html").read_text()
+    html = html.replace("bt3.js", tag + ".js")
+    (DIST / "bt3.html").write_text(html)
     (DIST / "version.txt").write_text(f"{stamp}\n")
     print("built into", DIST.relative_to(ROOT))
     return True
