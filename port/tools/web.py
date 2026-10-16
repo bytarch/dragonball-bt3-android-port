@@ -364,6 +364,10 @@ def package():
         if not (DIST / f).exists():
             print("missing", f)
             return False
+    # the version the deploy carries. A whole artifact is one unit — html/js/wasm must be from the same
+    # build (a mixed set is an import-table error) — so it is served from a folder named for the build.
+    stamp = os.environ.get("GITHUB_RUN_NUMBER") or "dev"
+    (DIST / "version.txt").write_text(f"{stamp}\n")
     print("built into", DIST.relative_to(ROOT))
     return True
 
