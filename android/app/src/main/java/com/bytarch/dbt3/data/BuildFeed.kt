@@ -5,9 +5,12 @@ import org.json.JSONObject
 
 /**
  * The build feed on the project's own server: one small JSON next to the ISO, read at every launch. A new build can be
- * announced — and its APK pointed at — by replacing that one file, with no new app version.
+ * announced — and its archive pointed at — by replacing that one file, with no new app version.
  *
- *   {"version":"0.6.0","versionCode":600,"apkUrl":"https://…/app-release.apk","size":12345678,"notes":"…"}
+ *   {"version":"0.6.0","versionCode":600,"apkUrl":"https://…apk","winUrl":"https://…zip","size":1,"notes":"…"}
+ *
+ * Each build gets its own download: the Android app takes `apkUrl` (and installs the apk), the Windows launcher
+ * `winUrl` (and unpacks the zip). One file names both, so the two builds never point at each other's archive.
  */
 object BuildFeed {
     const val URL = "https://gcode.bytarch.com/version.json"

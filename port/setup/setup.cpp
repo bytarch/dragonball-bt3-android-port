@@ -109,6 +109,8 @@ static std::vector<StepRow> sBoot;
 static int sBootStep = 0;      // the step at work; sBootStep == the number of steps means it is over
 static Uint64 sBootStart;
 static Feed sFeed;
+static bool sUpdateDownloading; // this build's own zip (winUrl) is on its way
+static std::string sNotice;      // what to say on the next page (a finished download)
 static bool sIsoDownloaded;     // the image on disk is ours: it is deleted once it has been unpacked
 static std::string sVersion;    // this program's own version, from version.txt next to it
 static ImTextureID sBackdrop;
@@ -151,8 +153,39 @@ static long long version_code(const std::string &v) {
     return out;
 }
 
-static void boot_begin() {
-    sBoot.assign(sizeof(kBootSteps) / sizeof(kBootSteps[0]), StepRow());
+// A newer build for this computer: the feed's winUrl, which is this build's own archive (the phone app's apk is
+// the Android app's business). Unknown without version.txt: nothing is claimed then.
+static bool update_ready(void) {
+    return sFeed.ok && !sVersion.empty() && version_code(sFeed.version) > version_code(sVersion);
+}
+
+// The finished download: Windows will not let anything replace this program while it runs, so the archive is
+// unpacked by hand, over this folder, with the game closed. Opening the folder is the whole of it.
+static void pump_update(void) {
+    if (!sUpdateDownloading) {
+        return;
+    }
+    long long done = 0, total = 0;
+    bool running = false;
+    std::string error;
+    Dl_Poll(done, total, running, error);
+    if (running) {
+        return;
+    }
+    sUpdateDownloading = false;
+    if (!error.empty()) {
+        sError = "The new build could not be downloaded: " + error + ".";
+        sPage = PAGE_FAILED;
+        return;
+    }
+    sNotice = "Build " + sFeed.version + " is downloaded: DBT3-windows-x64.zip, next to this program. Close the game, "
+              "then unpack the zip over this folder (it replaces DBT3.exe, DBT3-game.exe and their files) and start "
+              "DBT3 again.";
+    SDL_OpenURL(("file://" + sRoot).c_str());
+    sPage = PAGE_PICK;
+}
+
+static void boot_begin() {    sBoot.assign(sizeof(kBootSteps) / sizeof(kBootSteps[0]), StepRow());
     for (size_t i = 0; i < sBoot.size(); i++) {
         sBoot[i].title = kBootSteps[i];
     }
@@ -614,6 +647,34 @@ static void page_boot(void) {
     ImGui::Dummy(ImVec2(0.0f, 4.0f));
     ImGui::ProgressBar((float)done / (float)(sBoot.empty() ? 1 : sBoot.size()), ImVec2(-FLT_MIN, 8.0f), "");
     ImGui::TextColored(kDim, "Please wait...");
+    if (!update_ready() && !sUpdateDownloading) {
+        return;
+    }
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+    if (sUpdateDownloading) {
+        long long got = 0, all = 0;
+        bool running = false;
+        std::string error;
+        Dl_Poll(got, all, running, error);
+        std::string label = "Build " + sFeed.version + "  " + human_bytes(got) + (all > 0 ? " of " + human_bytes(all) : "");
+        ImGui::ProgressBar(all > 0 ? (float)got / (float)all : 0.0f, ImVec2(-FLT_MIN, 8.0f), label.c_str());
+        bottom_row(1);
+        if (big_button("Cancel", false)) {
+            Dl_Cancel();
+            sUpdateDownloading = false;
+        }
+        return;
+    }
+    ImGui::TextWrapped("Build %s is out. It is a zip, unpacked over this folder with the game closed.", sFeed.version.c_str());
+    bottom_row(1);
+    if (big_button(("Get build " + sFeed.version).c_str(), true, !Dl_Active())) {
+        std::string error;
+        if (Dl_Start(sFeed.win_url, sRoot + "DBT3-windows-x64.zip", error)) {
+            sUpdateDownloading = true;
+        } else {
+            sError = error;
+        }
+    }
 }
 
 static void page_pick() {
@@ -621,6 +682,12 @@ static void page_pick() {
     bool ok = file_exists(sIso);
 
     heading(LAUNCH, "This sets the game up on your computer from your own PlayStation 2 disc.");
+    if (!sNotice.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, kGreen);
+        ImGui::TextWrapped("%s", sNotice.c_str());
+        ImGui::PopStyleColor();
+        sNotice.clear();
+    }
     ImGui::TextWrapped("Choose your disc image of Dragon Ball Z: Budokai Tenkaichi 3, USA release (SLUS-21678), as an .iso file. "
                        "The game's data is taken from it and stays on this computer. %s",
                        sRelease ? "Nothing is downloaded." : "Nothing is downloaded except one small tool.");
@@ -1044,6 +1111,7 @@ int main(int argc, char **argv) {
             }
         }
         boot_tick();
+        pump_update();
         pump_download();
         pump_install();
         if (sPage == PAGE_DONE && sIsoDownloaded) { // the image has been unpacked: only the game data is needed now

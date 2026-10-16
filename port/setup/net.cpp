@@ -156,16 +156,16 @@ Feed Net_Feed(const std::string &url) {
     // eight seconds: this one runs while the boot screen waits for it, so a server that is not there must not hold
     // the window still for the download's half minute
     if (request(url, to_string, &text, &done, &total, f.error, 8000)) {
-        // {"version":"0.6.0","versionCode":600,"apkUrl":"https://…","size":1,"notes":"…"}
+        // {"version":"0.6.0","versionCode":600,"apkUrl":"https://…apk","winUrl":"https://…zip","size":1,"notes":"…"}
         // A missing piece means the file is not one of ours: it counts as no answer, not as a broken answer.
         const char *v = strstr(text.c_str(), "\"version\"");
         const char *c = strstr(text.c_str(), "\"versionCode\"");
-        const char *u = strstr(text.c_str(), "\"apkUrl\"");
+        const char *u = strstr(text.c_str(), "\"winUrl\""); // this program's own archive, not the phone app's
         if (v != NULL && c != NULL && u != NULL) {
             f.version = value_at(v + 9);
             f.code = atoll(c + 13);
-            f.apk_url = value_at(u + 8);
-            f.ok = f.code >= 0 && f.apk_url.compare(0, 8, "https://") == 0;
+            f.win_url = value_at(u + 8);
+            f.ok = f.code >= 0 && f.win_url.compare(0, 8, "https://") == 0;
             if (!f.ok) {
                 f.error = "the build feed is not readable";
             }

@@ -9,10 +9,11 @@
 #include <string>
 
 // The build feed on the project's own server (one small JSON, next to the ISO): which build is the newest one, and
-// where its archive is. Fails with `unavailable` where there is no HTTPS.
+// where each build's own archive is (apkUrl for the phone app, winUrl for this one). Fails with `unavailable` where
+// there is no HTTPS.
 struct Feed {
     bool ok = false;
-    std::string version, notes, apk_url, error;
+    std::string version, notes, apk_url, win_url, error;
     long long code = -1, size = -1;
 };
 Feed Net_Feed(const std::string &url);

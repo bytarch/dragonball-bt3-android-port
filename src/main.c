@@ -65,7 +65,7 @@ extern u8 MainMenu_StartBallLoops[]; /* overlay load address */
  * the launcher, which passes BT3_LAUNCH: a double click on the game, or a copy of it in another folder, is
  * refused. Nowhere else is there a launcher to pass it (the phone app starts the engine itself, the web build has
  * no files), so this is Windows-only and a developer's own build is not affected. */
-extern volatile uint32_t gPortDataStripped;
+extern volatile u32 gPortDataStripped;
 #include <stdio.h>
 #include <stdlib.h>
 #endif

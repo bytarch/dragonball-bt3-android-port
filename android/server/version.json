@@ -2,6 +2,7 @@
   "version": "0.5.0",
   "versionCode": 500,
   "apkUrl": "https://github.com/bytarch/dragonball-bt3-android-port/releases/download/android-v0.5.0/app-release.apk",
+  "winUrl": "https://github.com/bytarch/dragonball-bt3-android-port/releases/download/win-v0.5.0/DBT3-windows-x64.zip",
   "size": 0,
   "notes": ""
 }
