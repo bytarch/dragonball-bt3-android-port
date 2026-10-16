@@ -27,8 +27,8 @@ EM_ASYNC_JS(int, WebData_Open, (const char *path), {
 EM_JS(long, WebData_Size, (int h), {
   return WEB_DATA.sizeOf($0) | 0;
 });
-EM_ASYNC_JS(size_t, WebData_Read, (int h, long off, size_t bytes, void *buf), {
-  return await WEB_DATA.read($0, $1, $2, $3);
+EM_ASYNC_JS(size_t, WebData_Read, (int h, long off, void *buf, size_t bytes), {
+  return await WEB_DATA.read($0, $1, $3, $2);
 });
 EM_JS(void, WebData_Close, (int h), {
   WEB_DATA.close($0);
