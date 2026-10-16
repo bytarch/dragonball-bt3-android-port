@@ -163,6 +163,11 @@ def shaders():
         "/* generated from port/src/gs/shaders by port/tools/web.py (GLSL only; the web build has no glslc) */\n" + "".join(arrays))
 
 
+def data_source(f):
+    """The wasm assembler wants the bare section directives (the ELF builds take the files unchanged)."""
+    return re.sub(r"^\.section\s+\.(data|bss|rodata)\s*$", r".\1", f.read_text(), flags=re.M)
+
+
 def compile_all():
     OBJ.mkdir(parents=True, exist_ok=True)
     DATA.mkdir(parents=True, exist_ok=True)
@@ -190,7 +195,10 @@ def compile_all():
     for old in DATA.glob("*.o"):
         old.unlink()
     for f in (sorted((ROOT / "port/data").glob("*.s")) if blank else real):
-        r = run([EMCC, "-c", str(f), "-o", str(DATA / (f.name[:-2] + ".o"))])
+        src = GEN / "data" / f.name
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_text(data_source(f))
+        r = run([EMCC, "-c", str(src), "-o", str(DATA / (f.name[:-2] + ".o"))])
         if r.returncode:
             failed.append(f.name)
             print("FAILED", f.name, r.stderr.strip()[:300])

@@ -60,7 +60,7 @@ jobs:
         run: |
           python3 port/tools/web.py > web_build.txt 2>&1 || true
           tail -5 web_build.txt
-          grep -q "^built into" web_build.txt || { grep -E "^FAILED|error|undefined symbol" web_build.txt > web_errors.txt || true; tail -30 web_build.txt >> web_errors.txt; sh .github/annotate.sh web_errors.txt; exit 1; }
+          grep -q "^built into" web_build.txt || { grep -E "^FAILED|error|undefined symbol" web_build.txt > web_errors.txt || true; tail -30 web_build.txt >> web_errors.txt; sh .github/annotate.sh web_errors.txt; echo "---- full build log, tail ----"; tail -c 20000 web_build.txt; exit 1; }
           sh .github/annotate.sh web_build.txt notice
           ls -la port/build/web/dist
 
