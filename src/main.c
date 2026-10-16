@@ -54,7 +54,11 @@ extern void Progress_Main(s32); /* DBZP.BIN entry: menu / mode dispatcher */
 extern void Battle_Main(s32);
 
 extern OverlayEntry gOverlayTbl[];
+#ifdef __EMSCRIPTEN__
+extern void MainMenu_StartBallLoops(void); /* overlay load address: on the web a table index, not a memory address (nothing is read into it there) */
+#else
 extern u8 MainMenu_StartBallLoops[]; /* overlay load address */
+#endif
 
 /* Program entry called by crt0: runs the game, which never returns. (The compiler adds the call to __main, the static
  * constructor runner, by itself.) */
@@ -74,7 +78,7 @@ s32 Overlay_Load(s32 idx) {
     size = sceLseek(fd, 0, SCE_SEEK_END);
     sceLseek(fd, 0, SCE_SEEK_SET);
     FlushCache(0);
-    while (sceRead(fd, MainMenu_StartBallLoops, size) != size) {
+    while (sceRead(fd, (void *)MainMenu_StartBallLoops, size) != size) {
     }
     FlushCache(2);
     sceClose(fd);
