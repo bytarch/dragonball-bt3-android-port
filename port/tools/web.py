@@ -298,10 +298,10 @@ def link():
                                 "-sALLOW_MEMORY_GROWTH=1", "-sINITIAL_MEMORY=134217728", "-sMAXIMUM_MEMORY=4GB",
                                 "-sSTACK_SIZE=8MB", "-sFULL_ES3=1", "-sMAX_WEBGL_VERSION=2", "-sMIN_WEBGL_VERSION=2",
                                 "-sGL_ENABLE_GET_PROC_ADDRESS=1", "-sEXIT_RUNTIME=0", "-sASSERTIONS=1",
-                                "-sEXPORTED_FUNCTIONS=___wrap_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",
+                                "-sEXPORTED_FUNCTIONS=_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",
                                 "--no-entry", "--shell-file", str(HERE / "web_shell.html"),
                                 f"-I{SDL3 / 'include'}", f"-L{SDL3 / 'lib'}", "-lSDL3",
-                                "-Wl,--wrap=main,--wrap=Progress_Main"] + sdl3_link_flags() + extra
+                                "-Wl,--wrap=Progress_Main"] + sdl3_link_flags() + extra
 
     DIST.mkdir(parents=True, exist_ok=True)
     extra, typed, stubs, need = [], set(), False, []

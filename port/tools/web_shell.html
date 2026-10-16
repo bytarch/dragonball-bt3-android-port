@@ -25,7 +25,7 @@
     onRuntimeInitialized: function () {
       status.textContent += '\nstarting the engine (this is a compile spike: the platform layer is still the other builds\', so it stops at the first missing piece; stubs.txt next to these files lists them)';
       setTimeout(function () {
-        try { Module.ccall('__wrap_main', 'number', ['number', 'number'], [0, 0]); }
+        try { Module.ccall('main', 'number', [], []); }
         catch (e) { status.textContent += '\nengine stopped: ' + e; }
       }, 50);
     },
