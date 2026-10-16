@@ -291,6 +291,16 @@ def sdl3_link_flags():
 def link():
     """Links dist/bt3.html with one stub per symbol the web platform does not provide yet (android.py's
     link does the same for Android), then relinks with them so that the failure list is the report."""
+    # D_3BE71C is a PS2 address the other builds make a symbol with --defsym; wasm-ld has none, so it
+    # gets a real (empty) data object instead. heap.c only reads its address (the heap's size base), so
+    # the value differs from the other builds by wherever the data section happens to sit.
+    anchor = GEN / "webdata.s"
+    anchor.parent.mkdir(parents=True, exist_ok=True)
+    anchor.write_text(".data\n.p2align 4\n.globl D_3BE71C\nD_3BE71C:\n.space 4\n.size D_3BE71C, 4\n")
+    r = run([EMCC, "-c", str(anchor), "-o", str(OBJ / "webdata.o")])
+    if r.returncode:
+        print(r.stderr[:600])
+        return False
     objs = [str(o) for o in sorted(OBJ.glob("*.o")) + sorted(DATA.glob("*.o"))]
 
     def link_cmd(extra):
@@ -301,7 +311,7 @@ def link():
                                 "-sEXPORTED_FUNCTIONS=_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",
                                 "--no-entry", "--shell-file", str(HERE / "web_shell.html"),
                                 f"-I{SDL3 / 'include'}", f"-L{SDL3 / 'lib'}", "-lSDL3",
-                                "-Wl,--wrap=Progress_Main", "-Wl,--defsym=D_3BE71C=0x3BE71C"] + sdl3_link_flags() + extra
+                                "-Wl,--wrap=Progress_Main"] + sdl3_link_flags() + extra
 
     DIST.mkdir(parents=True, exist_ok=True)
     extra, typed, stubs, need = [], set(), False, []
