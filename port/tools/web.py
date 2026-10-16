@@ -70,6 +70,30 @@ def soft_float():
 
 SOFT = ["-msoft-float"] if soft_float() else []
 
+
+def llvm_nm():
+    """The llvm-nm that comes with the EMCC in use."""
+    p = shutil.which(EMCC)
+    if p:
+        cand = pathlib.Path(p).resolve().parent.parent / "bin" / "llvm-nm"
+        if cand.exists():
+            return str(cand)
+    return "llvm-nm"
+
+
+def defined_functions():
+    """Which names the game's objects define as functions: the data tables' pointers to them must be
+    typed (wasm has no plain-address functions; the linker refuses to guess between table and memory)."""
+    objs = sorted(OBJ.glob("*.o"))
+    if not objs:
+        return set()
+    r = run([llvm_nm(), "--defined-only"] + [str(o) for o in objs])
+    if r.returncode:
+        print(r.stderr)
+        sys.exit(1)
+    return {t[-1] for t in (l.split() for l in r.stdout.splitlines())
+            if len(t) >= 2 and t[-2] in ("T", "t", "W", "w")}
+
 # the game's code: the flags of android.py's GAME, minus the ARM-specific soft-float ABI
 GAME = [EMCC, "-std=gnu89", "-c", "-O2", "-g1", "-fno-strict-aliasing", "-ffp-contract=off", "-fcommon", "-w",
         "-fno-builtin", "-fms-extensions", "-Wno-error=return-mismatch",
@@ -163,10 +187,11 @@ def shaders():
         "/* generated from port/src/gs/shaders by port/tools/web.py (GLSL only; the web build has no glslc) */\n" + "".join(arrays))
 
 
-def data_source(f):
+def data_source(f, funcs):
     """The wasm assembler takes neither the ELF section syntax nor a symbol without an explicit size:
-    every table goes to .data (BSS included), and a .size follows each label."""
-    out, cur, size = [], None, 0
+    every table goes to .data (BSS included), a .size follows each label, and a name the objects
+    define as a function is said to be one (the word in the table is a table index, not an address)."""
+    out, cur, size, typed = [], None, 0, set()
 
     def flush():
         nonlocal cur, size
@@ -187,6 +212,11 @@ def data_source(f):
             out.append(line)
             cur, size = s[:-1], 0
         else:
+            if s.startswith(".long"):
+                for t in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", s):
+                    if t in funcs and t not in typed:
+                        typed.add(t)
+                        out.append(".type %s, @function" % t)
             out.append(line)
             if cur is not None:
                 if s.startswith(".space") or s.startswith(".zero"):
@@ -222,12 +252,13 @@ def compile_all():
     # the game's data tables: blank (their values come from the user's disc at start) unless real ones were made
     real = sorted((ROOT / "port/build/gen/data").glob("*.s"))
     blank = os.environ.get("BT3_SKELETON") == "1" or not real
+    funcs = defined_functions()
     for old in DATA.glob("*.o"):
         old.unlink()
     for f in (sorted((ROOT / "port/data").glob("*.s")) if blank else real):
         src = GEN / "data" / f.name
         src.parent.mkdir(parents=True, exist_ok=True)
-        src.write_text(data_source(f))
+        src.write_text(data_source(f, funcs))
         r = run([EMCC, "-c", str(src), "-o", str(DATA / (f.name[:-2] + ".o"))])
         if r.returncode:
             failed.append(f.name)
