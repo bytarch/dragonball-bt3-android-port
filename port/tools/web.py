@@ -315,7 +315,7 @@ def link():
 
     DIST.mkdir(parents=True, exist_ok=True)
     extra, typed, stubbed, need = [], set(), set(), []
-    for i in range(12):
+    for i in range(20):
         r = run(link_cmd(extra))
         need = sorted(set(re.findall(r"undefined symbol: (\w+)", r.stderr)))
         mism = sorted(set(re.findall(r"symbol type mismatch: (\w+)", r.stderr)) - typed)
@@ -346,14 +346,14 @@ def link():
             extra = [str(GEN / "stubs.o")]
             continue
         break
-    (DIST / "stubs.txt").write_text("".join(n + "\n" for n in need))
+    (DIST / "stubs.txt").write_text("".join(n + "\n" for n in sorted(stubbed)))
     errs = [l for l in r.stderr.splitlines() if "error" in l]
     if r.returncode:
-        print(f"{len(need)} stubs; link FAILED")
+        print(f"{len(stubbed)} stubs; link FAILED")
         for l in errs[:20]:
             print("  " + l[-200:])
         return False
-    print(f"{len(need)} stubs; link OK")
+    print(f"{len(stubbed)} stubs; link OK")
     return True
 
 
