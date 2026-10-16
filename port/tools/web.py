@@ -318,6 +318,9 @@ def link():
     def link_cmd(extra):
         return [EMCXX] + objs + ["-o", str(DIST / "bt3.html"), "-O2",
                                 "-sALLOW_MEMORY_GROWTH=1", "-sINITIAL_MEMORY=134217728", "-sMAXIMUM_MEMORY=4GB",
+                                # the engine's own data, stack and malloc arena live above 0x2000000: the game's
+                                # low world (its heap at 0x3BE000.., the emulated drive and so on) has 0..0x2000000
+                                "-sGLOBAL_BASE=0x2000000",
                                 "-sSTACK_SIZE=8MB", "-sFULL_ES3=1", "-sMAX_WEBGL_VERSION=2", "-sMIN_WEBGL_VERSION=2",
                                 "-sGL_ENABLE_GET_PROC_ADDRESS=1", "-sEXIT_RUNTIME=0", "-sASSERTIONS=1",
                                 "-sEXPORTED_FUNCTIONS=_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",

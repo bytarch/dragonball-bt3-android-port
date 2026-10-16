@@ -197,6 +197,13 @@ static int fixed_flag(uintptr_t lo, size_t len) {
 }
 
 static void map(uint32_t addr, uint32_t size, const char *what) {
+#ifdef __EMSCRIPTEN__
+    /* wasm32: the game's low world is already there. A flat 32-bit memory holds it at the PS2's addresses
+       and the engine keeps itself above 0x2000000 (-sGLOBAL_BASE), so a fixed map is true with nothing done. */
+    (void)addr;
+    (void)size;
+    (void)what;
+#else
     /* whole pages around the region (the system's pages may be 16 KB: an Android device's) */
     uint32_t page = (uint32_t)sysconf(_SC_PAGESIZE), base = addr & ~(page - 1), len = (addr - base + size + page - 1) & ~(page - 1);
     void *p = mmap((void *)(uintptr_t)base, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | fixed_flag(base, len),
@@ -210,6 +217,7 @@ static void map(uint32_t addr, uint32_t size, const char *what) {
 #endif
         exit(2);
     }
+#endif
 }
 
 static void map_heap(void) {
