@@ -1,0 +1,71 @@
+# Builds the engine for the web (Emscripten/WebAssembly): port/tools/web.py produces
+# port/build/web/dist (bt3.html + bt3.js + bt3.wasm) as the artifact of the run.
+#
+# Status: first cut. It compiles and links the engine for wasm32; the platform layer is still the
+# POSIX/Android one, so the missing parts become link stubs (dist/stubs.txt lists them, the page
+# stops at the first one). port/tools/web.py's docstring has what a real web port still needs.
+# SDL3 is built from source for Emscripten (the same 3.4.12 the Windows build links against,
+# port/tools/link.py).
+#
+#   push / pull request   the dist as the artifact of the run (a build check)
+#   "Run workflow"        the same
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths: ["port/**", "src/**", "include/**", ".github/workflows/web.yml"]
+  pull_request:
+    paths: ["port/**", "src/**", "include/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      SDL3_TAG: release-3.4.12 # the SDL3 the Windows build uses (port/tools/link.py)
+    steps:
+      - uses: actions/checkout@v5
+
+      # Emscripten: setup-emsdk's default ("latest") until this build has come green a few times,
+      # then give it the version the runs used
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Emscripten version
+        run: emcc --version | head -2
+
+      # SDL3 for Emscripten: the same sources as the other builds' SDL3, built by emcmake. Rebuilt
+      # every run: its CMake config records absolute --js-library paths, a cache would revive stale ones.
+      - name: SDL3 for Emscripten
+        run: |
+          git clone --depth 1 --branch "$SDL3_TAG" https://github.com/libsdl-org/SDL "$RUNNER_TEMP/SDL"
+          emcmake cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL-build" -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build "$RUNNER_TEMP/SDL-build" -j "$(nproc)"
+          cmake --install "$RUNNER_TEMP/SDL-build" --prefix "$PWD/port/build/web-toolchain/sdl3"
+          ls port/build/web-toolchain/sdl3/lib
+
+      # The engine: port/tools/web.py (compile, link, package), as the Android workflow runs android.py
+      - name: Engine
+        env:
+          BT3_SKELETON: "1" # the data tables blank, from port/data: a build needs no disc
+          BT3_SDL3: port/build/web-toolchain/sdl3
+        run: |
+          python3 port/tools/web.py > web_build.txt 2>&1 || true
+          tail -5 web_build.txt
+          grep -q "^built into" web_build.txt || { grep -E "^FAILED|error|undefined symbol" web_build.txt > web_errors.txt || true; tail -30 web_build.txt >> web_errors.txt; sh .github/annotate.sh web_errors.txt; exit 1; }
+          sh .github/annotate.sh web_build.txt notice
+          ls -la port/build/web/dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DBT3-web-${{ github.run_number }}
+          path: port/build/web/dist
+          if-no-files-found: error

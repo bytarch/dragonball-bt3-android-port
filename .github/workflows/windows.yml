@@ -1,0 +1,70 @@
+# Builds the DBT3 PC port for Windows x86-64 (port/, the same engine as Android and Linux).
+#
+# The Windows programs are cross-compiled on Linux, inside the release container (port/release/Dockerfile) - the same
+# image port/release/build.sh builds on a machine, and the same way upstream builds them:
+#   mingw-w64          x86_64-w64-mingw32 gcc, g++, as, nm, objdump (port/tools/toolchain.py, variant win64)
+#   clang / LLVM 22    clang and llc, for the game code, which goes clang -> LLVM IR (port/tools/irfix.py) -> llc ->
+#                      object because its 4-byte pointers need the code generator's help
+#   SDL3 3.4.12        the mingw development package the linker links against (port/tools/link.py)
+#   glslang            glslangValidator, for the shaders (undefined.py falls back to it when there is no glslc)
+# It is the release environment, so this workflow builds the same programs a release ships.
+#
+# Not on windows-2022: LLVM's own Windows installer ships clang and lld but no llc.exe at all, and the runner's LLVM
+# has none either, so there is no llc for the game code on a Windows runner.
+#
+#   push / pull request        the Windows archive as an artifact (a build check)
+#   a tag  win-vX.Y.Z          the same
+#   "Run workflow" button      the same as a push
+#
+# inside.sh builds with BT3_SKELETON=1: the data tables are compiled blank (no disc image in the build), so it is a
+# build check and a program that starts, not a playable build. To play, put a gamedata/ unpacked from the USA release
+# (SLUS-21678) in the unpacked folder - see README. The game data is not in this repository.
+name: windows
+
+on:
+  push:
+    branches: [main]
+    tags: ["win-v*"]
+    paths: ["port/**", "src/**", "include/**", "config/**", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["port/**", "src/**", "include/**", "config/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      # The release image. Its layers are cached by Actions, so only the changed ones are built again.
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: port/release
+          load: true
+          tags: bt3-port-release:jamy
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The build itself: port/release/inside.sh in win mode, the normal PC-port steps (undefined.py then link.py)
+      # with the win64 variant and blank data tables, then the setup window and package.py. -u "$(id -u)" and
+      # HOME=/tmp keep the files on the runner's user, not root's.
+      - name: Build
+        run: |
+          mkdir -p port/build
+          docker run --rm -u "$(id -u)" -e HOME=/tmp -v "$PWD":/src -w /src bt3-port-release:jamy sh port/release/inside.sh win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DBT3-win-${{ github.run_number }}
+          path: port/build/DBT3-windows-x64.zip
+          if-no-files-found: error

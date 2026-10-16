@@ -1,0 +1,34 @@
+/* The desktop program's icon and version information, put into the executable by port/tools/link.py (windres).
+ *
+ * The icon is the Android one, repainted square by port/tools/make_icon.py from the phone's launcher background
+ * drawable and its ic_dbt3_fg foreground - Windows has neither an adaptive mask nor vector backgrounds. Run that
+ * tool after the phone's icon changes, so the two cannot drift apart.
+ *
+ * Without this the exe is a generic blank one and the task manager and the file properties say nothing useful.
+ */
+1 ICON "dbt3.ico"
+
+1 VERSIONINFO
+FILEVERSION 0, 0, 0, 0
+PRODUCTVERSION 0, 0, 0, 0
+FILEOS 0x40004L
+FILETYPE 0x1L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0" /* English, Unicode */
+        BEGIN
+            VALUE "FileDescription", "DBT3"
+            VALUE "ProductName", "DBT3"
+            VALUE "FileVersion", "0.0.0"
+            VALUE "ProductVersion", "0.0.0"
+            VALUE "CompanyName", "bytarch"
+            VALUE "InternalName", "DBT3"
+            VALUE "OriginalFilename", "DBT3.exe"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

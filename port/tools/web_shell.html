@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- The web page port/tools/web.py links the engine against (emcc --shell-file). First cut: the canvas
+     the GL back end renders into, and the log the program and its stubs write to. The engine runs on
+     the main thread, so the browser freezes while it runs (a compile spike, see web.py's docstring). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DBT3 (web, first cut)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; background: #111; color: #ddd; font: 14px system-ui, sans-serif; }
+  #status { max-width: 60em; margin: 0.75em auto; padding: 0 1em; white-space: pre-wrap; }
+  canvas { display: block; margin: 0.75em auto; background: #000; width: min(96vw, 1024px); height: auto; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div id="status">DBT3, first cut for the web: loading the program...</div>
+<canvas id="canvas" tabindex="-1"></canvas>
+<script>
+  var status = document.getElementById('status');
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: function (t) { status.textContent += '\n' + t; },
+    printErr: function (t) { status.textContent += '\n' + t; },
+    onRuntimeInitialized: function () {
+      status.textContent += '\nstarting the engine (this is a compile spike: the platform layer is still the other builds\', so it stops at the first missing piece; stubs.txt next to these files lists them)';
+      setTimeout(function () {
+        try { Module.ccall('__wrap_main', 'number', ['number', 'number'], [0, 0]); }
+        catch (e) { status.textContent += '\nengine stopped: ' + e; }
+      }, 50);
+    },
+  };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

@@ -1,0 +1,53 @@
+*.iso
+*.rvz
+/disc/
+/wii/
+/tools/
+/.venv/
+/build/
+/asm/
+/assets/
+*.o
+.splache
+__pycache__/
+/build.ninja
+.ninja_*
+/port/build/
+/gamedata/
+port/tests/ps2float/*.o
+port/tests/ps2float/*.s
+!port/tests/ps2float/crt0*.s
+port/tests/ps2float/*.elf
+port/tests/ps2float/*.bin
+bt3_pipelines.txt
+bt3_crash.txt
+saves/
+bt3_settings.txt
+docs/port/img/
+port/tests/ps2float/test.elf
+port/tests/ps2float/*.o
+/bt3-setup
+/DBT3-setup
+/play.sh
+install.log
+port/build_release/
+
+# environment files, never committed (the matchmaking example is port/matchmaking/env.example)
+.env
+.env.*
+matchmaking.env
+
+# stages and songs from outside the disc that a player drops in next to the game (never committed)
+/stages/
+/songs/
+/textures/
+
+# Android: the engine's build outputs copied into the app (port/tools/android.py install)
+/android/app/src/main/jniLibs/
+/android/app/src/main/assets/libbt3.so.dat
+/android/app/src/main/assets/libbt3.so.rel
+/android/app/src/main/assets/libbt3.so.mem
+/android/app/src/main/java/org/libsdl/
+
+# the matchmaking service is not part of this repository (it has its own private one)
+port/matchmaking/
