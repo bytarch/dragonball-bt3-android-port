@@ -381,18 +381,20 @@ def package():
         if not (DIST / f).exists():
             print("missing", f)
             return False
-    # the build's files carry ITS number (a whole artifact is one unit; a mixed set is an import error and
-    # a stale cache mix looks identical to one on the browser side): named bt3-<stamp>.{js,wasm}, and the
-    # html's script tag follows (the wasm name the engine asks for follows it through locateFile).
+    # the build's files carry ITS number: bt3-<stamp>.html, .js, .wasm are the deployment (a whole artifact
+    # is one unit; a mixed set is an import error and a stale cache mix looks exactly like one). The html's
+    # script tag and the engine's wasm name are switched to the stamped names; index.html leads there.
     stamp = build_stamp()
     tag = f"bt3-{stamp}"
-    shutil.move(DIST / "bt3.js", DIST / (tag + ".js"))
-    shutil.move(DIST / "bt3.wasm", DIST / (tag + ".wasm"))
     html = (DIST / "bt3.html").read_text()
     html = html.replace("bt3.js", tag + ".js")
-    (DIST / "bt3.html").write_text(html)
+    (DIST / (tag + ".html")).write_text(html)
+    shutil.move(DIST / "bt3.js", DIST / (tag + ".js"))
+    shutil.move(DIST / "bt3.wasm", DIST / (tag + ".wasm"))
+    (DIST / "bt3.html").unlink()
+    (DIST / "index.html").write_text(f'<meta http-equiv="refresh" content="0;url={tag}.html">\n')
     (DIST / "version.txt").write_text(f"{stamp}\n")
-    print("built into", DIST.relative_to(ROOT))
+    print("built into", DIST.relative_to(ROOT), "as", tag)
     return True
 
 
