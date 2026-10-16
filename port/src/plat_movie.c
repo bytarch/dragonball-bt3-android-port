@@ -49,7 +49,11 @@ static void movie_start(void) {
     if ((!GsGpu_Enabled() && getenv("BT3_PAD_PLAY") == NULL) || gPortMoviePath[0] == '\0' || getenv("BT3_NOMOVIE") != NULL || Port_NetSession()) {
         return;
     }
+#ifdef __EMSCRIPTEN__
+    sMovie = NULL; /* no movie playback on the web yet: the streamed span would be movie-sized */
+#else
     sMovie = Mpeg2_Open(gPortMoviePath);
+#endif
     sEnd = sMovie == NULL;
 }
 

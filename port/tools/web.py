@@ -310,6 +310,8 @@ def link():
                                 "-sGL_ENABLE_GET_PROC_ADDRESS=1", "-sEXIT_RUNTIME=0", "-sASSERTIONS=1",
                                 "-sEXPORTED_FUNCTIONS=_main", "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap",
                                 "--no-entry", "--shell-file", str(HERE / "web_shell.html"),
+                                # the file layer: port/tools/webdata.js, and the async reads it makes possible
+                                "--js-library", str(HERE / "webdata.js"), "-sASYNCIFY=1",
                                 f"-I{SDL3 / 'include'}", f"-L{SDL3 / 'lib'}", "-lSDL3",
                                 "-Wl,--wrap=Progress_Main"] + sdl3_link_flags() + extra
 

@@ -18,7 +18,10 @@
 <canvas id="canvas" tabindex="-1"></canvas>
 <script>
   var status = document.getElementById('status');
+  /* The disc image the engine reads (port/tools/webdata.js): the deployment's own URL; ?data=URL overrides. */
+  var dataUrl = new URLSearchParams(location.search).get('data') || 'https://gcode.bytarch.com/DBT3-MOBILE.iso';
   var Module = {
+    dataUrl: dataUrl,
     canvas: document.getElementById('canvas'),
     print: function (t) { status.textContent += '\n' + t; },
     printErr: function (t) { status.textContent += '\n' + t; },

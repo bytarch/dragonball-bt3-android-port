@@ -18,9 +18,25 @@ extern void Port_StateTouch(void *p, unsigned long n); /* gs/state.c */
 
 extern const char *Port_FileRoot(void); /* plat_file.c: BT3_DATA or "gamedata" */
 
+#ifdef __EMSCRIPTEN__
+/* The web host: the data lives inside the disc image the page names, over HTTP (port/tools/webdata.js,
+ * a --js-library). Same shape as the PC host, without a file system: a handle opens a path of the image,
+ * its reads give where in the file they read. So a span keeps its base and restore-and-replay still works. */
+extern int WebData_Open(const char *path); /* a handle into the image (-1: the image or this file is not there) */
+extern long WebData_Size(int h);
+extern size_t WebData_Read(int h, long off, void *buf, size_t bytes);
+extern void WebData_Close(int h);
+
+#define PORT_HOST_WEB 1
+#endif
+
 enum { SLOTS = 32 };
 /* base: where the file starts in the host file (0, or its place inside an AFS archive) */
+#ifdef PORT_HOST_WEB
+static struct { char rel[128]; int web; long base, size; unsigned long used; } sSlot[SLOTS];
+#else
 static struct { char rel[128]; FILE *fp; long base, size; unsigned long used; } sSlot[SLOTS];
+#endif
 static unsigned long sClock;
 static volatile int sLock;
 
@@ -47,6 +63,42 @@ int Port_AfsSpan(const char *rel, char *path, unsigned n, long *base, long *size
         return 0;
     }
     if (!sAfs[i].tried) {
+#ifdef PORT_HOST_WEB
+        /* the whole AFS archive, as a file of the disc image: its header and table in two reads */
+        int h, k;
+        uint8_t head[8];
+        uint32_t count;
+        uint8_t *raw;
+
+        sAfs[i].tried = 1;
+        snprintf(sAfs[i].part, sizeof(sAfs[i].part), "%s", part);
+        k = snprintf(sAfs[i].path, sizeof(sAfs[i].path), "disc/DATA/");
+        for (pl = 0; part[pl] != '\0' && k < (int)sizeof(sAfs[i].path) - 5; pl++) {
+            sAfs[i].path[k++] = (char)toupper((unsigned char)part[pl]);
+        }
+        snprintf(sAfs[i].path + k, sizeof(sAfs[i].path) - (size_t)k, ".AFS");
+        h = WebData_Open(sAfs[i].path);
+        if (h >= 0 && WebData_Size(h) > 20) {
+            count = 0;
+            if (WebData_Read(h, 0, head, 8) == 8 && memcmp(head, "AFS", 4) == 0) {
+                count = (uint32_t)head[4] | (uint32_t)head[5] << 8 | (uint32_t)head[6] << 16 | (uint32_t)head[7] << 24;
+                raw = count < 0x100000 ? malloc((size_t)count * 8) : NULL;
+                if (raw != NULL && WebData_Read(h, 8, raw, (size_t)count * 8) == count * 8) {
+                    sAfs[i].toc = malloc((size_t)count * 8);
+                    for (k = 0; sAfs[i].toc != NULL && k < (int)count * 2; k++) {
+                        sAfs[i].toc[k] = (uint32_t)raw[k * 4] | (uint32_t)raw[k * 4 + 1] << 8 | (uint32_t)raw[k * 4 + 2] << 16 |
+                                         (uint32_t)raw[k * 4 + 3] << 24;
+                    }
+                    sAfs[i].count = sAfs[i].toc != NULL ? count : 0;
+                    fprintf(stderr, "bt3: archive %s: %u files\n", sAfs[i].path, sAfs[i].count);
+                }
+                free(raw);
+            } else {
+                fprintf(stderr, "bt3: %s: not an AFS archive\n", sAfs[i].path);
+            }
+            WebData_Close(h);
+        }
+#else
         FILE *fp;
         uint8_t head[8];
         sAfs[i].tried = 1;
@@ -74,6 +126,7 @@ int Port_AfsSpan(const char *rel, char *path, unsigned n, long *base, long *size
             }
             fclose(fp);
         }
+#endif
     }
     if (sAfs[i].toc == NULL || (uint32_t)index >= sAfs[i].count) {
         return 0;
@@ -88,14 +141,56 @@ static int slot_of(const char *rel) {
     char path[512];
     int i, old = 0;
     long base = 0, span = -1;
+#ifdef PORT_HOST_WEB
+    int h = -1;
+    const char *inner;
+#else
     FILE *fp;
+#endif
 
     for (i = 0; i < SLOTS; i++) {
+#ifdef PORT_HOST_WEB
+        if (sSlot[i].web != 0 && strcmp(sSlot[i].rel, rel) == 0) {
+#else
         if (sSlot[i].fp != NULL && strcmp(sSlot[i].rel, rel) == 0) {
+#endif
             sSlot[i].used = ++sClock;
             return i;
         }
     }
+#ifdef PORT_HOST_WEB
+    inner = strncmp(rel, "disc/", 5) == 0 ? rel + 5 : rel;
+    h = WebData_Open(inner); /* a file of the disc's tree ("disc/DATA/..."); an AFS-backed rel misses and falls through */
+    if (h < 0 && Port_AfsSpan(rel, path, (unsigned)sizeof(path), &base, &span)) {
+        h = WebData_Open(path); /* the whole archive: this slot reads it from base onward */
+    }
+    if (h < 0) {
+        fprintf(stderr, "bt3: file not found: %s\n", rel);
+        return -1;
+    }
+    if (span < 0) {
+        base = 0;
+        span = WebData_Size(h);
+    }
+    for (i = 0; i < SLOTS; i++) {
+        if (sSlot[i].web == 0) {
+            old = i;
+            break;
+        }
+        if (sSlot[i].used < sSlot[old].used) {
+            old = i;
+        }
+    }
+    if (sSlot[old].web != 0) {
+        WebData_Close(sSlot[old].web);
+    }
+    snprintf(sSlot[old].rel, sizeof(sSlot[old].rel), "%s", rel);
+    sSlot[old].web = h;
+    sSlot[old].base = base;
+    sSlot[old].size = span;
+    sSlot[old].used = ++sClock;
+    return old;
+#else
     {
         /* a stage added from outside the disc: the game asks for a file id past the disc's own, and the file is
            the one the stage list names (plat_stages.c), under the data folder */
@@ -159,6 +254,7 @@ static int slot_of(const char *rel) {
     }
     sSlot[old].used = ++sClock;
     return old;
+#endif
 }
 
 /* The file's size in bytes, or -1 if there is no such file. */
@@ -180,12 +276,18 @@ size_t Port_FileReadAt(const char *rel, long offset, void *buf, size_t bytes) {
     while (__sync_lock_test_and_set(&sLock, 1)) {
     }
     i = slot_of(rel);
-    if (i >= 0 && offset >= 0 && offset < sSlot[i].size && fseek(sSlot[i].fp, sSlot[i].base + offset, SEEK_SET) == 0) {
+    if (i >= 0 && offset >= 0 && offset < sSlot[i].size) {
         if ((long)bytes > sSlot[i].size - offset) { /* (in an archive the next file follows) */
             bytes = (size_t)(sSlot[i].size - offset);
         }
         Port_StateTouch(buf, bytes); /* (gs/state.c: file data straight into watched memory) */
-        got = fread(buf, 1, bytes, sSlot[i].fp);
+#ifdef PORT_HOST_WEB
+        got = WebData_Read(sSlot[i].web, sSlot[i].base + offset, buf, bytes);
+#else
+        if (fseek(sSlot[i].fp, sSlot[i].base + offset, SEEK_SET) == 0) {
+            got = fread(buf, 1, bytes, sSlot[i].fp);
+        }
+#endif
     }
     __sync_lock_release(&sLock);
     return got;

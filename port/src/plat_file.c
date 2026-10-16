@@ -15,6 +15,16 @@
 #include "plat_stages.h"
 #include "plat_songs.h"
 
+#ifdef __EMSCRIPTEN__
+/* The web host (port/tools/webdata.js, a --js-library): the disc image over HTTP. The C side below keeps its
+   fopen callers' shape; the image answers through these four primitives (the badge of the other builds). */
+#include <emscripten.h>
+extern int WebData_Open(const char *path);
+extern long WebData_Size(int h);
+extern size_t WebData_Read(int h, long off, void *buf, size_t bytes);
+extern void WebData_Close(int h);
+#endif
+
 #define SECTOR 2048
 enum { STAT_STOP = 1, STAT_READING = 2, STAT_READEND = 3, STAT_ERROR = 4 };
 
@@ -109,6 +119,30 @@ int Port_FilePath(int ptid, int flid, const char *fname, char *out, int size) {
     } else {
         snprintf(rel, sizeof(rel), "%s/%05d.bin", sPartDir[ptid & 7], flid);
     }
+#ifdef __EMSCRIPTEN__
+    /* The image: a plain file of the disc's tree, or an entry of an archive the image carries. Songs and
+       stages added from outside the disc are not on the web build (the page gives the image only).
+       out gets "<root>/<rel>" or "<root>/<archive>#<base>+<size>", which Port_OpenSpan takes apart. */
+    {
+        extern int Port_AfsSpan(const char *rel, char *path, unsigned n, long *base, long *size);
+        char afs[400];
+        long base, span;
+        const char *iso = strncmp(rel, "disc/", 5) == 0 ? rel + 5 : rel;
+        int h;
+
+        if (Port_AfsSpan(rel, afs, (unsigned)sizeof(afs), &base, &span)) {
+            snprintf(out, (size_t)size, "%s/%s#%ld+%ld", root(), afs, base, span);
+            return 1;
+        }
+        h = WebData_Open(iso);
+        if (h < 0) {
+            return 0;
+        }
+        WebData_Close(h);
+        snprintf(out, (size_t)size, "%s/%s", root(), rel);
+        return 1;
+    }
+#endif
     {
         /* The streamed audio (a song added from outside the disc) reads through this path, so the manifest's
            aliases must apply here too, not only in open_rel. */
@@ -160,6 +194,46 @@ FILE *Port_OpenSpan(const char *path, long *size) {
         base = 0;
         span = -1;
     }
+#ifdef __EMSCRIPTEN__
+    /* The span (or whole file) comes over as one read. Songs are that size; movies would not be (they are
+       off on the web build, plat_movie.c). The bytes land in the memory file system under a unique name:
+       the caller of Port_OpenSpan keeps reading with fread, as on the other builds. */
+    {
+        size_t skip = strncmp(host, root(), strlen(root())) == 0 && host[strlen(root())] == '/' ? strlen(root()) + 1 : 0;
+        static char vname[64];
+        static int vseq;
+        void *raw;
+        int h;
+
+        h = WebData_Open(host + skip);
+        if (h < 0) {
+            return NULL;
+        }
+        if (span < 0) {
+            span = WebData_Size(h);
+        }
+        if (span <= 0 || span > 96 * 1024 * 1024) { /* songs, not movies */
+            WebData_Close(h);
+            return NULL;
+        }
+        raw = malloc((size_t)span);
+        if (raw == NULL || WebData_Read(h, base, raw, (size_t)span) != (size_t)span) {
+            free(raw);
+            WebData_Close(h);
+            return NULL;
+        }
+        WebData_Close(h);
+        snprintf(vname, sizeof(vname), "/_span%d.bin", ++vseq);
+        EM_ASM({ FS.writeFile(UTF8ToString($0), HEAPU8.subarray($1, $1 + $2), {canOwn:true}); }, vname,
+               (uintptr_t)raw, (uintptr_t)span);
+        free(raw);
+        fp = fopen(vname, "rb");
+        if (fp != NULL && size != NULL) {
+            *size = span;
+        }
+        return fp;
+    }
+#endif
     fp = fopen(host, "rb");
     if (fp == NULL) {
         return NULL;
