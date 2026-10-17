@@ -39,7 +39,6 @@ import com.bytarch.dbt3.BootState
 import com.bytarch.dbt3.BuildConfig
 import com.bytarch.dbt3.R
 import com.bytarch.dbt3.StepState
-import com.bytarch.dbt3.ui.components.stageGlow
 import com.bytarch.dbt3.ui.theme.Dbz
 import com.bytarch.dbt3.ui.theme.TitleStyle
 
@@ -53,7 +52,18 @@ import com.bytarch.dbt3.ui.theme.TitleStyle
  */
 @Composable
 fun BootScreen(boot: BootState) {
-    Box(Modifier.fillMaxSize().stageGlow(Dbz.BallAmber)) {
+    Box(Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.boot_backdrop),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.horizontalGradient(listOf(Color(0xF00A0B12), Color(0xA60A0B12))),
+            ),
+        )
         BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
             val short = maxHeight < 400.dp
             val total = boot.steps.size
