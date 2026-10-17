@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -142,11 +143,10 @@ fun HomeScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 playerName,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleLarge.copy(shadow = Shadow(Color.Black, Offset(1.5f, 1.5f))),
                                 fontWeight = FontWeight.Black,
                                 fontStyle = FontStyle.Italic,
                                 color = Dbz.SaiyanGold,
-                                shadow = Shadow(Color.Black, offset = androidx.compose.ui.geometry.Offset(1.5f, 1.5f)),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false),
@@ -420,11 +420,10 @@ fun HomeScreen(
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 stringResource(R.string.hud_battle),
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.headlineSmall.copy(shadow = Shadow(Color.Black, Offset(1.5f, 1.5f))),
                                 fontWeight = FontWeight.Black,
                                 fontStyle = FontStyle.Italic,
                                 color = if (installed) Color.White else Color.White.copy(alpha = 0.45f),
-                                shadow = Shadow(Color.Black, offset = androidx.compose.ui.geometry.Offset(1.5f, 1.5f)),
                             )
                         }
                     }

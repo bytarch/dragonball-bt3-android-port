@@ -342,11 +342,10 @@ fun HudHeader(title: String, subtitle: String? = null, onBack: () -> Unit, modif
         Column {
             Text(
                 title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineSmall.copy(shadow = Shadow(Color.Black, Offset(1.5f, 1.5f))),
                 fontWeight = FontWeight.Black,
                 fontStyle = FontStyle.Italic,
                 color = Dbz.SaiyanGold,
-                shadow = Shadow(Color.Black, offset = Offset(1.5f, 1.5f)),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
