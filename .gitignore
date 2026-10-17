@@ -51,3 +51,4 @@ matchmaking.env
 
 # the matchmaking service is not part of this repository (it has its own private one)
 port/matchmaking/
+watch.txt
