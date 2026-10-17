@@ -49,6 +49,7 @@ void Match_Room(const char *code, const char *key); /* net_match.c: the room a l
 void Match_SessionEnd(int won);                     /* net_match.c: the match ended without a result (a player left) */
 void Port_RecordAbandon(int me, int won);           /* plat_records.c: bt3_battles.txt, for a match nobody finished */
 int Port_RecordDecided(void);
+static void take_the_other_player(void); /* below: BT3_NET_PEER_*, read at the session's start for the Profile tab */
 
 enum { PAD = 18, RING = 4096, REDUNDANT = 16, MAGIC = 0x4E335442 /* "BT3N" */ };
 enum { T_HELLO = 1, T_HELLO_ACK = 2, T_INPUT = 3, T_BYE = 4, T_PING = 5, T_PONG = 6, T_CONFIG = 7, T_CONFIG_ACK = 8,
@@ -956,42 +957,42 @@ static int sPeerGone; /* the session ended because the other player was lost, no
 /* The other player in this session, as the launcher found them: their record is public, so it is passed in rather
    than asked for during the fight (ponytail: a session made from the game's own lobby window has no such line here -
    the lobby window shows the record itself, and Match_AskRecord brings this copy's own up to date). */
-static char sPeerName[32];
-static char sPeerId[24];
-static int sPeerWins = -1; /* -1: the service has not said */
-static int sPeerLosses;
+static char sOtherName[32];
+static char sOtherId[24];
+static int sOtherWins = -1; /* -1: the service has not said */
+static int sOtherLosses;
 
 static void take_the_other_player(void) {
     const char *name = getenv("BT3_NET_PEER_NAME"), *rec = getenv("BT3_NET_PEER_RECORD"), *id = getenv("BT3_NET_PEER_ID");
     int w, l;
 
     if (name != NULL) {
-        snprintf(sPeerName, sizeof(sPeerName), "%s", name);
+        snprintf(sOtherName, sizeof(sOtherName), "%s", name);
     }
     if (id != NULL) {
-        snprintf(sPeerId, sizeof(sPeerId), "%s", id);
+        snprintf(sOtherId, sizeof(sOtherId), "%s", id);
     }
     if (rec != NULL && sscanf(rec, "%d|%d", &w, &l) == 2 && w >= 0 && l >= 0) {
-        sPeerWins = w;
-        sPeerLosses = l;
+        sOtherWins = w;
+        sOtherLosses = l;
     }
 }
 
 const char *Port_NetPeerName(void) {
-    return Port_NetActive() ? sPeerName : "";
+    return Port_NetActive() ? sOtherName : "";
 }
 
 const char *Port_NetPeerId(void) {
-    return Port_NetActive() ? sPeerId : "";
+    return Port_NetActive() ? sOtherId : "";
 }
 
 /* 1 and this copy's opponent's wins and losses when the service has said them, 0 when it has not. */
 int Port_NetPeerRecord(int *wins, int *losses) {
-    if (!Port_NetActive() || sPeerWins < 0) {
+    if (!Port_NetActive() || sOtherWins < 0) {
         return 0;
     }
-    *wins = sPeerWins;
-    *losses = sPeerLosses;
+    *wins = sOtherWins;
+    *losses = sOtherLosses;
     return 1;
 }
 
