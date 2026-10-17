@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytarch.dbt3.AppViewModel
 import com.bytarch.dbt3.R
 import com.bytarch.dbt3.data.InstallState
+import com.bytarch.dbt3.data.formatBytes
 import com.bytarch.dbt3.ui.components.DragonBall
 import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.components.SlantedBox
