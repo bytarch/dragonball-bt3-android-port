@@ -27,6 +27,7 @@ import com.bytarch.dbt3.data.ExtraItem
 import com.bytarch.dbt3.data.ExtraKind
 import com.bytarch.dbt3.data.FileMod
 import com.bytarch.dbt3.data.GameDataInstaller
+import com.bytarch.dbt3.data.BattleRecord
 import com.bytarch.dbt3.data.GamePaths
 import com.bytarch.dbt3.data.GpuDriver
 import com.bytarch.dbt3.data.GpuDrivers
@@ -127,6 +128,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** This device's recovery code, and a way to take another device's (so one record follows the player). */
     private val _recovery = MutableStateFlow(settings.recoveryCode())
     val recoveryCode: StateFlow<String> = _recovery.asStateFlow()
+
+    // the online battles this device has finished, as the engine wrote them down
+    private val _record = MutableStateFlow<List<BattleRecord>>(emptyList())
+    val record: StateFlow<List<BattleRecord>> = _record.asStateFlow()
 
     fun setRecoveryCode(code: String): Boolean {
         val ok = settings.setRecoveryCode(code)
@@ -322,6 +327,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settings.load()
             _settings.value = settings.snapshot()
             _touch.value = touchStore.load() // (the game's own quick menu may have changed it)
+            _record.value = BattleRecord.read(paths.root) // (the game appends a line when a battle is decided)
         }
     }
 

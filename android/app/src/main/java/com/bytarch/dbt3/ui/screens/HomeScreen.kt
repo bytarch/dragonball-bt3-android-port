@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Person
@@ -88,6 +89,7 @@ fun HomeScreen(
     onOpenCheats: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenOnline: () -> Unit,
+    onOpenRecord: () -> Unit,
 ) {
     val install by vm.install.collectAsStateWithLifecycle()
     val packs by vm.texturePacks.collectAsStateWithLifecycle()
@@ -95,6 +97,7 @@ fun HomeScreen(
     val stages by vm.stages.collectAsStateWithLifecycle()
     val songs by vm.songs.collectAsStateWithLifecycle()
     val playerName by vm.playerName.collectAsStateWithLifecycle()
+    val record by vm.record.collectAsStateWithLifecycle()
     val code by vm.recoveryCode.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
@@ -135,6 +138,8 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     onClick = { codeDialog = true },
                 )
+                Spacer(Modifier.width(8.dp))
+                RecordChip(record.size, record.count { it.won == true }, onOpenRecord)
                 Spacer(Modifier.width(8.dp))
                 UpdateChip(update, onCheck = { vm.checkForUpdate(true) })
                 Spacer(Modifier.width(8.dp))
@@ -320,6 +325,37 @@ private fun ProfileChip(
                     )
                 }
             }
+        }
+    }
+}
+
+/** The player's record where the player is: won out of played so far, and the way into the whole thing. */
+@Composable
+private fun RecordChip(played: Int, won: Int, onClick: () -> Unit) {
+    HudPanel(
+        shape = HudShape(0.06f, 0f),
+        color = Panel,
+        border = Line,
+        padding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        onClick = onClick,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.EmojiEvents,
+                stringResource(R.string.nav_record),
+                Modifier.size(18.dp),
+                tint = Dbz.KiBlue,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (played == 0) stringResource(R.string.record_none_yet) else stringResource(R.string.record_chip, won, played),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                fontStyle = FontStyle.Italic,
+                color = Dbz.SaiyanGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

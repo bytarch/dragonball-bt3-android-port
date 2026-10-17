@@ -7,17 +7,18 @@
    (src/battle/btl_seq.c), where it first was: a fight's deciding call fills the winner and returns 1 in the same
    call, and the sequence leaves that state in the same tick, so no later call ever sees a winner and nothing was
    ever written. A fight left without a result (quit to the menu) carries only the abort bit and is not written.
-   Line: mode|winner|reason|epoch; winner bits as in docs/systems/battle.md: 1 P1, 2 P2, 4 draw, 8 abort (never
-   written), 0x10 replay. */
+   Line: mode|winner|reason|epoch|me; winner bits as in docs/systems/battle.md: 1 P1, 2 P2, 4 draw, 8 abort (never
+   written), 0x10 replay; `me` is the side this copy played (0 the host, 1 the one who joined), so whoever reads the
+   file back knows the fight from this device's point of view. */
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
-void Port_RecordBattle(int mode, int winner, int reason) {
+void Port_RecordBattle(int mode, int winner, int reason, int me) {
     FILE *f;
 
-    fprintf(stderr, "bt3: battle record: mode=%d winner=%d reason=%d\n", mode, winner, reason); /* temporary */
+    fprintf(stderr, "bt3: battle record: mode=%d winner=%d reason=%d me=%d\n", mode, winner, reason, me); /* temporary */
     if (!(winner & 7)) {
         return;
     }
@@ -26,6 +27,6 @@ void Port_RecordBattle(int mode, int winner, int reason) {
         fprintf(stderr, "bt3: battle record: no file: %s\n", strerror(errno)); /* temporary */
         return;
     }
-    fprintf(f, "%d|%d|%d|%ld\n", mode, winner, reason, (long)time(NULL));
+    fprintf(f, "%d|%d|%d|%ld|%d\n", mode, winner, reason, (long)time(NULL), me);
     fclose(f);
 }

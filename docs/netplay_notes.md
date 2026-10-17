@@ -971,6 +971,12 @@ relay address (it still connects directly).
   and that one is an abort, which is not written either. The write now happens in the place that already says "the
   match is over" (port/src/headless.c, next to `Match_Report`: state 4 or past, a side that won, not during a
   rollback's re-run, once per fight) - same guards, same tick, both peers, every platform.
+- The line says which side the copy played (`mode|winner|reason|epoch|me`, from `Port_NetMe()`), so a reader knows the
+  fight from this device's point of view. The launcher reads that file back (`data/BattleRecord.kt`): a record control
+  in the profile row of the home screen (won out of played so far) and a screen behind it - played / won / lost /
+  draws, then every battle with when and how it ended. It is read on every resume, so a match finished in the game
+  is there when the launcher is back in front. A line written before that field existed (me -1) reads as "-", not as
+  a loss.
 - A session the launcher started ends the program when the session ends (net.c `Port_NetLeave`). `Port_SessionReturn`
   is for a session asked for from inside the running game, which saved the game's state to come back to; a launcher
   session saves none, and `Port_SessionCan` is true anyway (the boot snapshot is taken on every run), so the restore
@@ -979,5 +985,5 @@ relay address (it still connects directly).
   the environment (`sFromBoot`) now says "back to the launcher" and exits 0 before that: the copy of the game the
   launcher started is done with, and the launcher is what the player is looking at again. A session started from
   inside the game (the lobby window in the running game) still returns to the game as before.
-- Not tried yet: the two fixes above (dev.67) - a match played out with the record written and a clean return to the
-  launcher, and the record read back by the launcher's battle pass.
+- Not tried yet: dev.68 on a real match - the record written with the side that played, a clean return to the
+  launcher, and the record screen showing both.

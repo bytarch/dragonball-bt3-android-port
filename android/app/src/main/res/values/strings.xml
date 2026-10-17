@@ -383,4 +383,22 @@
     <string name="hud_tab_cheats">Cheats</string>
     <string name="hud_tab_settings">Settings</string>
     <string name="hud_tab_controls">Controls</string>
+<string name="nav_record">Record</string>
+    <string name="record_title">Battle record</string>
+    <string name="record_sub">Every online battle this device has finished</string>
+    <string name="record_played">Played</string>
+    <string name="record_won">Won</string>
+    <string name="record_lost">Lost</string>
+    <string name="record_draws">Draws</string>
+    <string name="record_chip">%1$d / %2$d</string>
+    <string name="record_none_yet">No battles</string>
+    <string name="record_result_win">WON</string>
+    <string name="record_result_loss">LOST</string>
+    <string name="record_result_draw">DRAW</string>
+    <string name="record_result_unknown">—</string>
+    <string name="record_ko">K.O.</string>
+    <string name="record_time_up">Time up</string>
+    <string name="record_reason_other">Reason %1$d</string>
+    <string name="record_empty">No battles yet</string>
+    <string name="record_empty_text">Finish an online battle and it is written down here.</string>
 </resources>
