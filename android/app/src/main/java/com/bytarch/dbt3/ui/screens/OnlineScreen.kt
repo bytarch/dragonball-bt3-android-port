@@ -143,9 +143,10 @@ fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
                 }
                 if (state.peer.isNotEmpty()) Text(stringResource(R.string.online_peer, state.peer))
                 // the other player, as the service knows them: their record is public, and this is their public id
-                if (state.peerRecord != null) {
+                val peerRecord = state.peerRecord
+                if (peerRecord != null) {
                     Text(
-                        stringResource(R.string.online_peer_record, state.peerRecord.first, state.peerRecord.second),
+                        stringResource(R.string.online_peer_record, peerRecord.first, peerRecord.second),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
                         color = Dbz.ShenronGreen,
