@@ -2,10 +2,13 @@
    in - the app's own folder on Android, beside stages/ and songs/). The launcher reads it back to count matches
    and wins for the battle pass (android/app/src/main/java/com/bytarch/dbt3).
 
-   Written from BtlSeq_CheckBattleEnd (src/battle/btl_seq.c) the moment a fight is decided, once per fight - mid-
-   session fights write their line too, not only what a whole battle session leaves behind. A fight left without a
-   result (quit to the menu) carries only the abort bit and is not written. Line: mode|winner|reason|epoch; winner
-   bits as in docs/systems/battle.md: 1 P1, 2 P2, 4 draw, 8 abort (never written), 0x10 replay. */
+   Written by the session's own watcher (port/src/headless.c, next to "the match is over") the moment a decided
+   fight is seen, once per fight, never during a rollback's re-run. Not from BtlSeq_CheckBattleEnd
+   (src/battle/btl_seq.c), where it first was: a fight's deciding call fills the winner and returns 1 in the same
+   call, and the sequence leaves that state in the same tick, so no later call ever sees a winner and nothing was
+   ever written. A fight left without a result (quit to the menu) carries only the abort bit and is not written.
+   Line: mode|winner|reason|epoch; winner bits as in docs/systems/battle.md: 1 P1, 2 P2, 4 draw, 8 abort (never
+   written), 0x10 replay. */
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>

@@ -959,4 +959,25 @@ relay address (it still connects directly).
 - Tried and working (2026-10-17, dev.66): a pairing between a PC running the game (its own online screen) and the
   Android launcher, both ways - the launcher's greeting is the one the game's lobby answers, so the two find each
   other exactly as two games do (the text probe the launcher first used could only ever be answered by a launcher).
-- Not tried yet: a whole match's worth on this pairing (playing it out, the record, the return to the menu).
+- Tried and working (2026-10-17, dev.66): a whole match on that pairing, played out - PC host 192.168.18.151, the
+  phone joined as player 2, connected, input delay 1 blank, rollback 8, and the fight ran the whole way: the sequence
+  went 3, 4, 5, 6, 99 as a single-player one does, "the match is over, side 1 won", the other side told. Two things
+  were wrong at the end of it, both fixed after (dev.67).
+- **The battle record was never written, on any platform, and Android had nothing to do with it.** The hook sat at the
+  top of `BtlSeq_CheckBattleEnd` (src/battle/btl_seq.c), which can only see a fight that is already decided on a
+  *later* call - and there is no later call: every deciding path in that function (time up, the three flag-7 ones,
+  the three KO ones, replay) fills the winner and returns 1 in the same call, and `BtlSeqFight_Update` leaves state 3
+  in that same tick. The only fight the old hook could see was one left through `BattleResult_Set` (quit to the menu),
+  and that one is an abort, which is not written either. The write now happens in the place that already says "the
+  match is over" (port/src/headless.c, next to `Match_Report`: state 4 or past, a side that won, not during a
+  rollback's re-run, once per fight) - same guards, same tick, both peers, every platform.
+- A session the launcher started ends the program when the session ends (net.c `Port_NetLeave`). `Port_SessionReturn`
+  is for a session asked for from inside the running game, which saved the game's state to come back to; a launcher
+  session saves none, and `Port_SessionCan` is true anyway (the boot snapshot is taken on every run), so the restore
+  read a state that was never written and the engine died with signal 11 at address 0 right after "the session has
+  ended" - which is exactly what the phone's log of that finished match shows. On Android a session that came from
+  the environment (`sFromBoot`) now says "back to the launcher" and exits 0 before that: the copy of the game the
+  launcher started is done with, and the launcher is what the player is looking at again. A session started from
+  inside the game (the lobby window in the running game) still returns to the game as before.
+- Not tried yet: the two fixes above (dev.67) - a match played out with the record written and a clean return to the
+  launcher, and the record read back by the launcher's battle pass.

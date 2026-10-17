@@ -51,6 +51,10 @@ extern int Port_NetMe(void);                                             /* gs/n
 extern void Match_Report(int won);                                       /* gs/net_match.c: says how it went to the service */
 extern int gPortResim;                                                   /* gs_internal.h: the blank being re-run after a rollback */
 extern int BattleResult_GetWinnerSide(void);                              /* src/battle/battle_load.c: 0 or 1, 4 a draw, 8 an abort */
+extern int BattleResult_GetFlags(void);                                   /* src/battle/battle_load.c: the winner bits */
+extern int BattleResult_GetReason(void);
+extern int Battle_GetMode(void);                                          /* include/battle/battle.h */
+extern void Port_RecordBattle(int mode, int winner, int reason);          /* plat_records.c: bt3_battles.txt */
 extern struct { int unk0[2]; int loadPack, loadRes, loadSprites; int flags; int mode; } GAME_PTR gProgress; /* include/menu/menu_a.h */
 static int sNetEntered;
 /* Extra stage ids (BT3_STAGE_REPLACE="0x1b=0x24,0x23=0x25"): the menus swap the id in a stage-list slot for a
@@ -390,6 +394,7 @@ void Port_Trace(unsigned vblanks) {
             said = 1; /* 0 or 1 is a side that won; 4 is a draw and 8 an abort, and neither is a match result */
             fprintf(stderr, "bt3: net: the match is over, side %d won\n", (int)winner);
             Match_Report((int)winner == (int)Port_NetMe());
+            Port_RecordBattle(Battle_GetMode(), BattleResult_GetFlags(), BattleResult_GetReason()); /* the battle pass reads it */
         }
         if (gBtlSeq == NULL || gBtlSeq->state <= 3) {
             said = 0; /* the next fight is a match of its own */

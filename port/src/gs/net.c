@@ -602,6 +602,8 @@ static int receive(void) {
 }
 
 static int sSession; /* a session started from Dragon Net Battle (below), not a plain connected run */
+static int sFromBoot; /* and this copy of the game was itself started for it (the environment was there from the first breath,
+                         so its end ends the program: Port_NetLeave) */
 static int sArrived; /* its start-up has reached the character select */
 
 /* Connects: role 1 hosts on `port`, role 2 joins `join` ("address:port"). Waits until the other side is there. */
@@ -910,6 +912,7 @@ int Port_NetActive(void) {
         sMode = 0;
         if (host != NULL || join != NULL) {
             sSession = getenv("BT3_NET_SESSION") != NULL;
+            sFromBoot = sSession; /* this copy was started for that session (the launcher did it), not joined from inside */
             net_start(host != NULL ? 1 : 2, host, join);
         }
     }
@@ -1313,6 +1316,14 @@ void Port_NetLeave(void) {
             net_send(bye, sizeof(bye), &sPeer);
         }
     }
+    #ifdef __ANDROID__
+    if (sFromBoot) { /* the launcher started this copy of the game: the session's end is the end of it (back to the launcher).
+                        Port_SessionReturn is not it: this session never saved the game's state to come back to. */
+        fprintf(stderr, "bt3: net: back to the launcher\n");
+        fflush(NULL);
+        exit(0);
+    }
+#endif
     if (Port_SessionCan()) {
         Port_SessionReturn(); /* the game as it was when the session was asked for (does not return) */
     }
