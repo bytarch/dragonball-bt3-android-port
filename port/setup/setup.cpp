@@ -185,7 +185,8 @@ static void pump_update(void) {
     sPage = PAGE_PICK;
 }
 
-static void boot_begin() {    sBoot.assign(sizeof(kBootSteps) / sizeof(kBootSteps[0]), StepRow());
+static void boot_begin() {
+    sBoot.assign(sizeof(kBootSteps) / sizeof(kBootSteps[0]), StepRow());
     for (size_t i = 0; i < sBoot.size(); i++) {
         sBoot[i].title = kBootSteps[i];
     }
@@ -196,7 +197,23 @@ static void boot_begin() {    sBoot.assign(sizeof(kBootSteps) / sizeof(kBootStep
 
 // One step per frame: a game never hangs on one, and the window keeps drawing and closing.
 static void boot_tick(void) {
-    if (sPage != PAGE_BOOT || sBootStep >= (int)sBoot.size()) {
+    if (sPage != PAGE_BOOT) {
+        return;
+    }
+    if (sBootStep >= (int)sBoot.size()) {
+        // every check has landed: the page is held just long enough to read, then the one the player came for
+        if (SDL_GetTicks() - sBootStart < 1400) {
+            return;
+        }
+        sPage = sRelease && !sRoot.empty() && Native_Installed(sRoot) ? PAGE_DONE : PAGE_PICK;
+        if (sPage == PAGE_DONE) {
+            reset_rows();
+            for (auto &row : sRows) {
+                row.state = SKIPPED;
+                row.detail = "already done";
+            }
+            sLauncher = sRoot + (file_exists((sRoot + GAME ".exe").c_str()) ? GAME ".exe" : GAME);
+        }
         return;
     }
     StepRow &r = sBoot[sBootStep];
@@ -247,21 +264,6 @@ static void boot_tick(void) {
     sBootStep++;
     if (sBootStep < (int)sBoot.size()) {
         sBoot[sBootStep].state = RUNNING;
-        return;
-    }
-    // never a flash of a page the player cannot read (and never a frozen window while it waits: it is a gate, not a
-    // sleep)
-    if (SDL_GetTicks() - sBootStart < 1400) {
-        return;
-    }
-    sPage = sRelease && !sRoot.empty() && Native_Installed(sRoot) ? PAGE_DONE : PAGE_PICK;
-    if (sPage == PAGE_DONE) {
-        reset_rows();
-        for (auto &row : sRows) {
-            row.state = SKIPPED;
-            row.detail = "already done";
-        }
-        sLauncher = sRoot + (file_exists((sRoot + GAME ".exe").c_str()) ? GAME ".exe" : GAME);
     }
 }
 
