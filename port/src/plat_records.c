@@ -1,4 +1,4 @@
-/* battle_log.txt: one line per finished battle, appended next to the game's content (the folder the engine runs
+/* bt3_battles.txt: one line per finished battle, appended next to the game's content (the folder the engine runs
    in - the app's own folder on Android, beside stages/ and songs/). The launcher reads it back to count matches
    and wins for the battle pass (android/app/src/main/java/com/bytarch/dbt3).
 
@@ -15,7 +15,7 @@ void Port_RecordBattle(int mode, int winner, int reason) {
     if (!(winner & 7)) {
         return;
     }
-    f = fopen("battle_log.txt", "a");
+    f = fopen("bt3_battles.txt", "a");
     if (f != NULL) {
         fprintf(f, "%d|%d|%d|%ld\n", mode, winner, reason, (long)time(NULL));
         fclose(f);

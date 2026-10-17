@@ -1097,7 +1097,7 @@ void BattleResult_Finish(void) {
     }
 #ifdef PORT
     {
-        extern void Port_RecordBattle(int mode, int winner, int reason); /* port/src/plat_records.c: battle_log.txt */
+        extern void Port_RecordBattle(int mode, int winner, int reason); /* port/src/plat_records.c: bt3_battles.txt */
         Port_RecordBattle(Battle_GetMode(), res->winner, res->reason);
     }
 #endif
