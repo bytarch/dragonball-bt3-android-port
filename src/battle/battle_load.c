@@ -1095,6 +1095,12 @@ void BattleResult_Finish(void) {
     if (res->reason & 0x40) {
         res->winner |= 1;
     }
+#ifdef PORT
+    {
+        extern void Port_RecordBattle(int mode, int winner, int reason); /* port/src/plat_records.c: battle_log.txt */
+        Port_RecordBattle(Battle_GetMode(), res->winner, res->reason);
+    }
+#endif
 }
 
 /* Returns result.flags (winner / draw / abort bits). */
