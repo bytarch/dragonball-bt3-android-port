@@ -31,12 +31,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytarch.dbt3.AppViewModel
 import com.bytarch.dbt3.data.EngineSettings
 import com.bytarch.dbt3.ui.components.DragonBall
-import com.bytarch.dbt3.ui.components.ScreenTitle
+import com.bytarch.dbt3.ui.components.ScreenHeader
 import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.theme.Dbz
 
 @Composable
-fun CheatsScreen(vm: AppViewModel) {
+fun CheatsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val settings by vm.engineSettings.collectAsStateWithLifecycle()
     val pending = (settings[EngineSettings.UNLOCK_ALL] ?: 0) != 0
     var confirm by remember { mutableStateOf(false) }
@@ -45,7 +45,7 @@ fun CheatsScreen(vm: AppViewModel) {
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ScreenTitle(stringResource(R.string.cheats_title), stringResource(R.string.cheats_sub))
+        ScreenHeader(stringResource(R.string.cheats_title), onBack, stringResource(R.string.cheats_sub))
 
         SectionCard(stringResource(R.string.unlock_all), Icons.Rounded.LockOpen, accent = Dbz.SaiyanGold) {
             Row(verticalAlignment = Alignment.CenterVertically) {

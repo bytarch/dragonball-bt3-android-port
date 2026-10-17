@@ -98,11 +98,6 @@ fun HomeScreen(
     var codeDialog by remember { mutableStateOf(false) }
     var codeInput by remember { mutableStateOf("") }
     var codeNote by remember { mutableIntStateOf(0) }
-    val pickIso = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.installFromIso(uri)
-    }
-    var confirmRemove by remember { mutableStateOf(false) }
-    var confirmIso by remember { mutableStateOf(false) }
     val installed = install is InstallState.Installed
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -157,27 +152,12 @@ fun HomeScreen(
                             color = Dbz.SaiyanGold,
                         )
                     }
-                }
-                Spacer(Modifier.width(8.dp))
-                SlantedBox(Steel, skew = 0.14f, borderWidth = 2f, onClick = { vm.checkForUpdate(true) }) {
-                    Icon(Icons.Rounded.SystemUpdateAlt, stringResource(R.string.hud_check_update), Modifier.size(22.dp), tint = Dbz.SaiyanGold)
-                }
             }
 
             Spacer(Modifier.height(10.dp))
 
-            // ---- the middle: the game's own data on one side, the way into everything else on the other
+            // ---- the middle: the way into everything else, and what you have
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DataCard(
-                        install = install,
-                        onPick = { pickIso.launch(arrayOf("*/*")) },
-                        onDownload = { confirmIso = true },
-                        onRemove = { confirmRemove = true },
-                        onCancel = vm::cancelInstall,
-                        onDismissError = vm::dismissInstallError,
-                    )
-                }
                 Column(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         GridButton(Modifier.weight(1f), Icons.Rounded.Extension, R.string.battlepass_title, onOpenBattlePass)
@@ -191,11 +171,29 @@ fun HomeScreen(
                         GridButton(Modifier.weight(1f), Icons.Rounded.Memory, R.string.hud_save_log, { vm.exportLog() })
                         GridButton(Modifier.weight(1f), Icons.Rounded.AddToHomeScreen, R.string.shortcut_add, { vm.createPlayShortcut() }, skew = 0.14f)
                     }
+                }
+                Column(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         StatPill(stringResource(R.string.stat_textures), "${packs.count { it.enabled }}", Dbz.SaiyanGold, Modifier.weight(1f))
                         StatPill(stringResource(R.string.stat_mods), "${mods.count { it.enabled }}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         StatPill(stringResource(R.string.stat_stages), "${stages.size}", Dbz.KiBlue, Modifier.weight(1f))
                         StatPill(stringResource(R.string.stat_songs), "${songs.size}", Dbz.ShenronGreen, Modifier.weight(1f))
+                    }
+                    // the game's own data is Settings' business; all the lobby says about it is whether Play can happen
+                    SlantedBox(Steel, modifier = Modifier.fillMaxWidth(), skew = 0.14f, borderWidth = 2f, onClick = onOpenSettings) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Album, null, Modifier.size(18.dp), tint = if (installed) Dbz.ShenronGreen else Dbz.StarRed)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(if (installed) R.string.game_data_ok_short else R.string.game_data_missing),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
@@ -240,27 +238,6 @@ fun HomeScreen(
         }
     }
 
-    if (confirmRemove) {
-        AlertDialog(
-            onDismissRequest = { confirmRemove = false },
-            title = { Text(stringResource(R.string.remove_game_data_q)) },
-            text = { Text(stringResource(R.string.remove_game_data_text)) },
-            confirmButton = { TextButton(onClick = { confirmRemove = false; vm.removeGameData() }) { Text(stringResource(R.string.remove)) } },
-            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-
-    // 2.8 GB is a decision, not a tap: on mobile data it is the player's data plan, and it needs the free space.
-    if (confirmIso) {
-        AlertDialog(
-            onDismissRequest = { confirmIso = false },
-            title = { Text(stringResource(R.string.iso_dl)) },
-            text = { Text(stringResource(R.string.iso_dl_confirm)) },
-            confirmButton = { TextButton(onClick = { confirmIso = false; vm.downloadIso() }) { Text(stringResource(R.string.iso_dl_start)) } },
-            dismissButton = { TextButton(onClick = { confirmIso = false }) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-
     // Another device's record: a dialog, so the lobby keeps the space for the things that are always on it.
     if (codeDialog) {
         AlertDialog(
@@ -300,120 +277,6 @@ fun HomeScreen(
             },
             dismissButton = { TextButton(onClick = { codeDialog = false }) { Text(stringResource(R.string.close)) } },
         )
-    }
-}
-
-/** The game's own data: what it is, and the two ways to get it, and the way to take it away again. */
-@Composable
-private fun DataCard(
-    install: InstallState,
-    onPick: () -> Unit,
-    onDownload: () -> Unit,
-    onRemove: () -> Unit,
-    onCancel: () -> Unit,
-    onDismissError: () -> Unit,
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(Steel.copy(alpha = 0.55f))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Album, null, Modifier.size(18.dp), tint = Dbz.SaiyanGold)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stringResource(R.string.game_data),
-                style = MaterialTheme.typography.titleSmall,
-                color = Color.White,
-                maxLines = 1,
-            )
-        }
-        when (install) {
-            is InstallState.Installed -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.CheckCircle, null, Modifier.size(18.dp), tint = Dbz.ShenronGreen)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(
-                            if (install.modified) R.string.game_data_ok_mod else R.string.game_data_ok,
-                            install.files, formatBytes(install.bytes),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (install.modified) {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Rounded.Warning, null, Modifier.size(16.dp), tint = Dbz.SaiyanGold)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            stringResource(R.string.game_data_modified),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Dbz.SaiyanGold,
-                        )
-                    }
-                }
-                SlantedBox(Crimson, borderWidth = 2f, onClick = onRemove) {
-                    Text(stringResource(R.string.remove_game_data), color = Color.White, style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            is InstallState.Working -> {
-                Text(install.step, style = MaterialTheme.typography.bodyMedium, color = Color.White, maxLines = 2)
-                LinearProgressIndicator(
-                    progress = { install.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Dbz.SaiyanGold,
-                )
-                Text(
-                    install.detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                OutlinedButton(onClick = onCancel) {
-                    Icon(Icons.Rounded.Close, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-            is InstallState.Failed -> {
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Rounded.Warning, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.width(8.dp))
-                    Text(install.message, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 3)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onPick) { Text(stringResource(R.string.pick_other_iso)) }
-                    TextButton(onClick = onDismissError) { Text(stringResource(R.string.close)) }
-                }
-            }
-            InstallState.NotInstalled -> {
-                Text(
-                    stringResource(R.string.game_data_intro),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SlantedBox(Crimson, onClick = onPick) {
-                        Text(stringResource(R.string.pick_iso), color = Color.White, style = MaterialTheme.typography.labelLarge)
-                    }
-                    SlantedBox(Scarlet, skew = 0.14f, onClick = onDownload) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Download, null, Modifier.size(16.dp), tint = Color.White)
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.iso_dl), color = Color.White, style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

@@ -53,9 +53,23 @@ import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.theme.Dbz
 import com.bytarch.dbt3.ui.theme.ThemeMode
 import kotlin.math.roundToInt
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import com.bytarch.dbt3.data.InstallState
+import com.bytarch.dbt3.ui.components.GameDataCard
+import com.bytarch.dbt3.ui.components.ScreenHeader
 
 @Composable
-fun SettingsScreen(vm: AppViewModel) {
+fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
+    val install by vm.install.collectAsStateWithLifecycle()
+    val pickIso = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.installFromIso(uri)
+    }
+    var confirmIso by remember { mutableStateOf(false) }
+    var confirmRemove by remember { mutableStateOf(false) }
     val s by vm.engineSettings.collectAsStateWithLifecycle()
     val ui by vm.uiState.collectAsStateWithLifecycle()
     fun get(k: String, d: Int) = s[k] ?: d
@@ -63,9 +77,23 @@ fun SettingsScreen(vm: AppViewModel) {
     // Landscape is a short screen and these are seven cards: video, effects and audio on the left, performance,
     // the driver and log, and appearance with About on the right. One column below the width for it.
     Page(
-        title = { ScreenTitle(stringResource(R.string.settings_title), stringResource(R.string.settings_sub)) },
+        title = { ScreenHeader(stringResource(R.string.settings_title), onBack, stringResource(R.string.settings_sub)) },
         left = {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionCard(
+            stringResource(R.string.game_data),
+            Icons.Rounded.Album,
+            accent = if (install is InstallState.Installed) Dbz.ShenronGreen else MaterialTheme.colorScheme.error,
+        ) {
+            GameDataCard(
+                install = install,
+                onPick = { pickIso.launch(arrayOf("*/*")) },
+                onDownload = { confirmIso = true },
+                onRemove = { confirmRemove = true },
+                onCancel = vm::cancelInstall,
+                onDismissError = vm::dismissInstallError,
+            )
+        }
         SectionCard(stringResource(R.string.video), Icons.Rounded.Tv) {
             val steps = EngineSettings.SCALE_STEPS
             val q = get(EngineSettings.SCALE4, 0).takeIf { it > 0 } ?: (get(EngineSettings.SCALE, EngineSettings.SCALE_DEFAULT) * 4)
@@ -240,6 +268,25 @@ fun SettingsScreen(vm: AppViewModel) {
     }
         },
     )
+
+    if (confirmIso) {
+        AlertDialog(
+            onDismissRequest = { confirmIso = false },
+            title = { Text(stringResource(R.string.iso_dl)) },
+            text = { Text(stringResource(R.string.iso_dl_confirm)) },
+            confirmButton = { TextButton(onClick = { confirmIso = false; vm.downloadIso() }) { Text(stringResource(R.string.iso_dl_start)) } },
+            dismissButton = { TextButton(onClick = { confirmIso = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    if (confirmRemove) {
+        AlertDialog(
+            onDismissRequest = { confirmRemove = false },
+            title = { Text(stringResource(R.string.remove_game_data_q)) },
+            text = { Text(stringResource(R.string.remove_game_data_text)) },
+            confirmButton = { TextButton(onClick = { confirmRemove = false; vm.removeGameData() }) { Text(stringResource(R.string.remove)) } },
+            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
 }
 
 @Composable

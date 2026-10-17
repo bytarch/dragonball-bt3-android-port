@@ -67,7 +67,7 @@ import com.bytarch.dbt3.data.TexturePack
 import com.bytarch.dbt3.data.formatBytes
 import com.bytarch.dbt3.ui.components.BattlePassPreview
 import com.bytarch.dbt3.ui.components.EmptyState
-import com.bytarch.dbt3.ui.components.ScreenTitle
+import com.bytarch.dbt3.ui.components.ScreenHeader
 import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.theme.Dbz
 
@@ -77,7 +77,7 @@ import com.bytarch.dbt3.ui.theme.Dbz
  * They are one thing to a player (what the game looks like) and were two screens; the four tabs are the four kinds.
  */
 @Composable
-fun BattlePassScreen(vm: AppViewModel) {
+fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
     val packs by vm.texturePacks.collectAsStateWithLifecycle()
     val settings by vm.engineSettings.collectAsStateWithLifecycle()
     val mods by vm.fileMods.collectAsStateWithLifecycle()
@@ -110,8 +110,9 @@ fun BattlePassScreen(vm: AppViewModel) {
             ),
         )
         Column(Modifier.fillMaxSize()) {
-            ScreenTitle(
+            ScreenHeader(
             stringResource(R.string.battlepass_title),
+            onBack,
             stringResource(R.string.battlepass_sub),
             Modifier.padding(horizontal = 16.dp),
         )

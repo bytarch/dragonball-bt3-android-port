@@ -117,31 +117,7 @@ private fun Dbt3App(vm: AppViewModel) {
         containerColor = Color.Transparent,
         modifier = Modifier.background(colors.background).kiBackground(colors.primary, colors.secondary),
         snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = {
-            Column {
-                BusyBar(busy)
-                // the dock: one row, always at the bottom, the way a game keeps its controls under your thumbs
-                NavigationBar(
-                    containerColor = colors.surfaceContainer.copy(alpha = 0.95f),
-                    tonalElevation = 0.dp,
-                ) {
-                    Dest.entries.forEach { d ->
-                        val on = current == d.route
-                        NavigationBarItem(
-                            selected = on,
-                            onClick = { go(d) },
-                            icon = { Icon(d.icon, null, Modifier.size(if (on) 26.dp else 22.dp)) },
-                            label = { Text(stringResource(d.label), maxLines = 1, style = MaterialTheme.typography.labelSmall) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = colors.onPrimaryContainer,
-                                selectedTextColor = colors.primary,
-                                indicatorColor = colors.primaryContainer,
-                            ),
-                        )
-                    }
-                }
-            }
-        },
+        bottomBar = { BusyBar(busy) },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.TopCenter) {
             NavHost(
@@ -157,10 +133,11 @@ private fun Dbt3App(vm: AppViewModel) {
                         onOpenSettings = { go(Dest.SETTINGS) },
                     )
                 }
-                composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) }
-                composable(Dest.CONTROLS.route) { ControlsScreen(vm) }
-                composable(Dest.CHEATS.route) { CheatsScreen(vm) }
-                composable(Dest.SETTINGS.route) { SettingsScreen(vm) }
+                // there is no dock: every screen but the lobby carries its own way back to it
+                composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) { go(Dest.HOME) } }
+                composable(Dest.CONTROLS.route) { ControlsScreen(vm) { go(Dest.HOME) } }
+                composable(Dest.CHEATS.route) { CheatsScreen(vm) { go(Dest.HOME) } }
+                composable(Dest.SETTINGS.route) { SettingsScreen(vm) { go(Dest.HOME) } }
             }
         }
     }

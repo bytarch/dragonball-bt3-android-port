@@ -64,7 +64,7 @@ import com.bytarch.dbt3.touch.TouchPadView
 import com.bytarch.dbt3.touch.TouchSurface
 import com.bytarch.dbt3.touch.createTouchSurface
 import com.bytarch.dbt3.touch.view
-import com.bytarch.dbt3.ui.components.ScreenTitle
+import com.bytarch.dbt3.ui.components.ScreenHeader
 import com.bytarch.dbt3.data.EngineSettings
 import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.theme.Dbz
@@ -72,7 +72,7 @@ import kotlin.math.roundToInt
 
 /** The on-screen controller: when it shows, its look, its layout, and macros. */
 @Composable
-fun ControlsScreen(vm: AppViewModel) {
+fun ControlsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val c by vm.touch.collectAsStateWithLifecycle()
     val engine by vm.engineSettings.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
@@ -82,7 +82,7 @@ fun ControlsScreen(vm: AppViewModel) {
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ScreenTitle(stringResource(R.string.nav_controls), stringResource(R.string.controls_subtitle))
+        ScreenHeader(stringResource(R.string.nav_controls), onBack, stringResource(R.string.controls_subtitle))
 
         // a small picture of the layout, in the chosen look
         Box(

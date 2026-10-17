@@ -60,6 +60,10 @@
     <string name="hud_check_update">Check for an update</string>
     <string name="profile_code_short">Code %1$s</string>
     <string name="profile_code_in_short">Enter</string>
+    <string name="back_home">Back</string>
+    <string name="boot_count">%1$d / %2$d</string>
+    <string name="game_data_ok_short">Game data ready</string>
+    <string name="game_data_missing">Game data missing</string>
     <string name="battlepass_title">Battle pass</string>
     <string name="battlepass_sub">Texture packs, mods, stages and songs: everything that changes how the game looks and plays</string>
     <string name="tab_packs">Packs %1$d</string>

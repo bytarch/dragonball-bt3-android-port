@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,10 +43,12 @@ import com.bytarch.dbt3.ui.theme.Dbz
 import com.bytarch.dbt3.ui.theme.TitleStyle
 
 /**
- * What a player sees between tapping the icon and the lobby: the artwork, the build, and each check as it lands.
+ * What a player sees between tapping the icon and the lobby: the artwork, the build, the bar along the bottom, and
+ * each check as it happens.
  *
- * Laid out for the phone in landscape (about 800 x 360 dp): the title and the bar on the left, the checks on the
- * right, because a single column of five rows in a short window is a list that runs off the bottom.
+ * The list only carries what has already started: a check that has not begun says nothing, and a line with no
+ * detail to give draws no detail. Laid out for the phone in landscape (about 800 x 360 dp), which is why the bar is
+ * across the bottom rather than under the list.
  */
 @Composable
 fun BootScreen(boot: BootState) {
@@ -63,72 +64,90 @@ fun BootScreen(boot: BootState) {
                 Brush.horizontalGradient(listOf(Color(0xF00A0B12), Color(0xA60A0B12))),
             ),
         )
-        BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 14.dp)) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
             val short = maxHeight < 400.dp
-            val titleSize = if (short) TitleStyle.fontSize * 0.8f else TitleStyle.fontSize
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                // left: who is loading, and how far along
-                Column(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    Text(
-                        stringResource(R.string.app_name),
-                        style = TitleStyle.copy(fontSize = titleSize, lineHeight = titleSize * 0.95f),
-                        color = Dbz.SaiyanGold,
-                    )
-                    Text(
-                        stringResource(R.string.boot_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(if (short) 14.dp else 22.dp))
-                    val finished = boot.steps.count { it.state != StepState.Waiting && it.state != StepState.Working }
-                    LinearProgressIndicator(
-                        progress = { if (boot.steps.isEmpty()) 0f else finished.toFloat() / boot.steps.size },
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                        color = Dbz.SaiyanGold,
-                    )
-                    Spacer(Modifier.height(if (short) 8.dp else 12.dp))
-                    Text(
-                        stringResource(R.string.boot_please_wait),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                // right: the checks, each one as it lands
-                Column(
-                    Modifier
-                        .weight(1.15f)
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF0D1018).copy(alpha = 0.72f))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (short) 6.dp else 10.dp, Alignment.CenterVertically),
-                ) {
-                    boot.steps.forEach { step ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            StatusIcon(step.state)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    step.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (step.state == StepState.Waiting)
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                    else Color.White,
-                                    maxLines = 1,
-                                )
-                                if (step.detail.isNotEmpty()) {
+            val total = boot.steps.size
+            val started = boot.steps.count { it.state != StepState.Waiting }
+            val finished = boot.steps.count { it.state != StepState.Waiting && it.state != StepState.Working }
+            val working = boot.steps.firstOrNull { it.state == StepState.Working }
+
+            Column(Modifier.fillMaxSize()) {
+                // top: the name and the build, and the checks that have begun
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.Center) {
+                        val titleSize = if (short) TitleStyle.fontSize * 0.8f else TitleStyle.fontSize
+                        Text(
+                            stringResource(R.string.app_name),
+                            style = TitleStyle.copy(fontSize = titleSize, lineHeight = titleSize * 0.95f),
+                            color = Dbz.SaiyanGold,
+                        )
+                        Text(
+                            stringResource(R.string.boot_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Column(
+                        Modifier
+                            .weight(1.2f)
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF0D1018).copy(alpha = 0.72f))
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (short) 8.dp else 12.dp, Alignment.CenterVertically),
+                    ) {
+                        // only the checks that have started: a spinner while one runs, its result once it lands
+                        boot.steps.forEach { step ->
+                            if (step.state == StepState.Waiting) return@forEach
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                StatusIcon(step.state)
+                                Spacer(Modifier.width(14.dp))
+                                Column(Modifier.weight(1f)) {
                                     Text(
-                                        step.detail,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        step.label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
                                     )
+                                    // a line with nothing to say draws nothing
+                                    if (step.state != StepState.Working && step.detail.isNotEmpty()) {
+                                        Text(
+                                            step.detail,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                // bottom: the bar, and what it is doing
+                Spacer(Modifier.height(if (short) 8.dp else 14.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        working?.label ?: stringResource(R.string.boot_please_wait),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        stringResource(R.string.boot_count, finished, total),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Dbz.SaiyanGold,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { if (total == 0) 0f else finished.toFloat() / total },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = Dbz.SaiyanGold,
+                )
             }
         }
     }
@@ -137,13 +156,10 @@ fun BootScreen(boot: BootState) {
 @Composable
 private fun StatusIcon(state: StepState) {
     when (state) {
-        StepState.Waiting -> Icon(
-            Icons.Rounded.RadioButtonUnchecked, null, Modifier.size(18.dp),
-            tint = Color.White.copy(alpha = 0.22f),
-        )
-        StepState.Working -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Dbz.SaiyanGold)
-        StepState.Ok -> Icon(Icons.Rounded.CheckCircle, null, Modifier.size(18.dp), tint = Dbz.ShenronGreen)
-        StepState.Warn -> Icon(Icons.Rounded.Warning, null, Modifier.size(18.dp), tint = Dbz.SaiyanGold)
-        StepState.Fail -> Icon(Icons.Rounded.ErrorOutline, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+        StepState.Waiting -> Unit // never drawn: the row is not there yet
+        StepState.Working -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Dbz.SaiyanGold)
+        StepState.Ok -> Icon(Icons.Rounded.CheckCircle, null, Modifier.size(20.dp), tint = Dbz.ShenronGreen)
+        StepState.Warn -> Icon(Icons.Rounded.Warning, null, Modifier.size(20.dp), tint = Dbz.SaiyanGold)
+        StepState.Fail -> Icon(Icons.Rounded.ErrorOutline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
     }
 }
