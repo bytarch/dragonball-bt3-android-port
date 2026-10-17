@@ -64,9 +64,10 @@ import com.bytarch.dbt3.touch.TouchPadView
 import com.bytarch.dbt3.touch.TouchSurface
 import com.bytarch.dbt3.touch.createTouchSurface
 import com.bytarch.dbt3.touch.view
-import com.bytarch.dbt3.ui.components.ScreenHeader
+import com.bytarch.dbt3.ui.components.HudHeader
 import com.bytarch.dbt3.data.EngineSettings
 import com.bytarch.dbt3.ui.components.SectionCard
+import com.bytarch.dbt3.ui.components.stageBackdrop
 import com.bytarch.dbt3.ui.theme.Dbz
 import kotlin.math.roundToInt
 
@@ -79,10 +80,11 @@ fun ControlsScreen(vm: AppViewModel, onBack: () -> Unit) {
     var editMacro by remember { mutableStateOf<Macro?>(null) }
 
     Column(
+        Modifier.stageBackdrop(R.drawable.battlepass_bg, 0.9f)
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ScreenHeader(stringResource(R.string.nav_controls), onBack, stringResource(R.string.controls_subtitle))
+        HudHeader(stringResource(R.string.nav_controls), stringResource(R.string.controls_subtitle), onBack)
 
         // a small picture of the layout, in the chosen look
         Box(

@@ -67,7 +67,7 @@ import com.bytarch.dbt3.data.TexturePack
 import com.bytarch.dbt3.data.formatBytes
 import com.bytarch.dbt3.ui.components.BattlePassPreview
 import com.bytarch.dbt3.ui.components.EmptyState
-import com.bytarch.dbt3.ui.components.ScreenHeader
+import com.bytarch.dbt3.ui.components.HudHeader
 import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.theme.Dbz
 
@@ -110,17 +110,19 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
             ),
         )
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader(
-            stringResource(R.string.battlepass_title),
-            onBack,
-            stringResource(R.string.battlepass_sub),
-            Modifier.padding(horizontal = 16.dp),
-        )
-        TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
-            Tab(tab == 0, { tab = 0 }, text = { Text(stringResource(R.string.tab_packs, packs.size)) })
-            Tab(tab == 1, { tab = 1 }, text = { Text(stringResource(R.string.tab_files, mods.size)) })
-            Tab(tab == 2, { tab = 2 }, text = { Text(stringResource(R.string.tab_stages, stages.size)) })
-            Tab(tab == 3, { tab = 3 }, text = { Text(stringResource(R.string.tab_songs, songs.size)) })
+            HudHeader(
+                stringResource(R.string.battlepass_title),
+                stringResource(R.string.battlepass_sub),
+                onBack,
+            )
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HudChip(stringResource(R.string.tab_packs), packs.size, tab == 0) { tab = 0 }
+            HudChip(stringResource(R.string.tab_files), mods.size, tab == 1) { tab = 1 }
+            HudChip(stringResource(R.string.tab_stages), stages.size, tab == 2) { tab = 2 }
+            HudChip(stringResource(R.string.tab_songs), songs.size, tab == 3) { tab = 3 }
         }
 
         LazyColumn(

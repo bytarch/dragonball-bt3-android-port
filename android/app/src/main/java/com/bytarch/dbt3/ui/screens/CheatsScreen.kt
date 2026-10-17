@@ -31,8 +31,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytarch.dbt3.AppViewModel
 import com.bytarch.dbt3.data.EngineSettings
 import com.bytarch.dbt3.ui.components.DragonBall
-import com.bytarch.dbt3.ui.components.ScreenHeader
+import com.bytarch.dbt3.ui.components.HudHeader
 import com.bytarch.dbt3.ui.components.SectionCard
+import com.bytarch.dbt3.ui.components.stageBackdrop
 import com.bytarch.dbt3.ui.theme.Dbz
 
 @Composable
@@ -42,10 +43,11 @@ fun CheatsScreen(vm: AppViewModel, onBack: () -> Unit) {
     var confirm by remember { mutableStateOf(false) }
 
     Column(
+        Modifier.stageBackdrop(R.drawable.boot_backdrop, 0.88f)
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ScreenHeader(stringResource(R.string.cheats_title), onBack, stringResource(R.string.cheats_sub))
+        HudHeader(stringResource(R.string.cheats_title), stringResource(R.string.cheats_sub), onBack)
 
         SectionCard(stringResource(R.string.unlock_all), Icons.Rounded.LockOpen, accent = Dbz.SaiyanGold) {
             Row(verticalAlignment = Alignment.CenterVertically) {

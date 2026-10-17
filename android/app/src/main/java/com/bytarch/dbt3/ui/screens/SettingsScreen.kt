@@ -60,7 +60,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import com.bytarch.dbt3.data.InstallState
 import com.bytarch.dbt3.ui.components.GameDataCard
-import com.bytarch.dbt3.ui.components.ScreenHeader
+import com.bytarch.dbt3.ui.components.HudHeader
+import com.bytarch.dbt3.ui.components.stageBackdrop
 
 @Composable
 fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
@@ -77,7 +78,8 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
     // Landscape is a short screen and these are seven cards: video, effects and audio on the left, performance,
     // the driver and log, and appearance with About on the right. One column below the width for it.
     Page(
-        title = { ScreenHeader(stringResource(R.string.settings_title), onBack, stringResource(R.string.settings_sub)) },
+        modifier = Modifier.stageBackdrop(R.drawable.home_backdrop, 0.9f),
+        title = { HudHeader(stringResource(R.string.settings_title), stringResource(R.string.settings_sub), onBack) },
         left = {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionCard(

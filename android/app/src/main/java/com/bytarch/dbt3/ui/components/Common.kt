@@ -1,6 +1,18 @@
 package com.bytarch.dbt3.ui.components
 
 import androidx.compose.foundation.background
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +39,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import com.bytarch.dbt3.ui.theme.Dbz
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -235,5 +252,142 @@ fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Mo
     ) {
         Text(value, style = MaterialTheme.typography.headlineSmall, color = color)
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+
+/** The HUD's cut panels: the corners notched, so the outline follows the cut. [left] and [right] are the notches as a
+ * fraction of the width; 0 is a straight edge, and equal values give the battle button its two points. */
+class HudShape(private val left: Float, private val right: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val w = size.width
+        val h = size.height
+        val l = left * w
+        val r = w - right * w
+        val path = Path().apply {
+            moveTo(l, 0f)
+            lineTo(r, 0f)
+            lineTo(w, h / 2f)
+            lineTo(r, h)
+            lineTo(l, h)
+            if (left > 0f) lineTo(0f, h / 2f)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+/** A panel cut to [shape], the way every card and button in the lobby's HUD is. [brush] wins over [color] when both
+ * are given. */
+@Composable
+fun HudPanel(
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xF00B0D18),
+    brush: Brush? = null,
+    border: Color = Color(0x59FFD54F),
+    borderWidth: Float = 1.5f,
+    padding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .clip(shape)
+            .background(brush ?: SolidColor(color))
+            .border(borderWidth.dp, border, shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(padding),
+    ) {
+        content()
+    }
+}
+
+/** Our own art behind a screen, dimmed so text on top of it still reads. */
+@Composable
+fun Modifier.stageBackdrop(@DrawableRes res: Int, dim: Float = 0.82f): Modifier =
+    background(painterResource(res), contentScale = ContentScale.Crop)
+        .background(Color.Black.copy(alpha = dim))
+
+
+private val HudBg = Color(0xF00B0D18)
+private val HudLine = Color(0x59FFD54F)
+private val HudMuted = Color(0xFFB9C0D0)
+
+/** The top of every screen inside the game: the way back in the HUD's own button, then the name of the page. The
+ * art of the screen is behind it, so the header stays part of the game rather than part of the OS. */
+@Composable
+fun HudHeader(title: String, subtitle: String? = null, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(44.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(HudBg)
+                .border(1.5.dp, HudLine, RoundedCornerShape(8.dp))
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                stringResource(R.string.back_home),
+                Modifier.size(20.dp),
+                tint = Dbz.SaiyanGold,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+                fontStyle = FontStyle.Italic,
+                color = Dbz.SaiyanGold,
+                shadow = Shadow(Color.Black, offset = Offset(1.5f, 1.5f)),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!subtitle.isNullOrEmpty()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = HudMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** A tab along a screen's top, in the HUD's style: the one you are on is gold, the rest are grey. */
+@Composable
+fun HudChip(label: String, count: Int, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(HudShape(0.12f, 0.12f))
+            .background(if (active) Color(0x33FFD54F) else HudBg)
+            .border(1.dp, if (active) Dbz.SaiyanGold else HudLine, HudShape(0.12f, 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Black,
+            color = if (active) Dbz.SaiyanGold else HudMuted,
+            maxLines = 1,
+        )
+        if (count >= 0) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (active) Dbz.BallLight else HudMuted,
+            )
+        }
     }
 }
