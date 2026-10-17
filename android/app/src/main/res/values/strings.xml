@@ -384,6 +384,8 @@
     <string name="hud_tab_settings">Settings</string>
     <string name="hud_tab_controls">Controls</string>
 <string name="nav_record">Record</string>
+    <string name="online_quick">Quick match</string>
+    <string name="online_quick_sub">Find an opponent</string>
     <string name="record_title">Battle record</string>
     <string name="record_sub">Every online battle this device has finished</string>
     <string name="record_played">Played</string>

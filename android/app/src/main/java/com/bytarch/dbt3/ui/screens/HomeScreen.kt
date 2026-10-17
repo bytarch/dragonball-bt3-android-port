@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Memory
@@ -59,6 +61,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytarch.dbt3.AppViewModel
+import com.bytarch.dbt3.OnlinePhase
+import com.bytarch.dbt3.OnlineState
 import com.bytarch.dbt3.R
 import com.bytarch.dbt3.data.InstallState
 import com.bytarch.dbt3.data.UpdateState
@@ -98,6 +102,9 @@ fun HomeScreen(
     val songs by vm.songs.collectAsStateWithLifecycle()
     val playerName by vm.playerName.collectAsStateWithLifecycle()
     val record by vm.record.collectAsStateWithLifecycle()
+    val online by vm.online.collectAsStateWithLifecycle()
+    // a room of this player's own: the wait begins at once, the online screen is where its code is shown
+    val onCreateRoom = { vm.onlineHost(); onOpenOnline() }
     val code by vm.recoveryCode.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
@@ -150,6 +157,12 @@ fun HomeScreen(
 
             Spacer(Modifier.height(8.dp))
 
+            // a match being found from here (quick match, or a room made here): what it is doing, and the way to give it up
+            if (online.phase != OnlinePhase.IDLE) {
+                OnlineBusy(online) { vm.onlineCancel() }
+                Spacer(Modifier.height(8.dp))
+            }
+
             // ---------------------------------------------------------------- the middle: rail, stage, cards
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 Column(
@@ -160,6 +173,8 @@ fun HomeScreen(
                     RailIcon(Icons.Rounded.Album, Dbz.SaiyanGold, R.string.nav_battlepass, onOpenBattlePass)
                     RailIcon(Icons.Rounded.LockOpen, Dbz.ShenronGreen, R.string.nav_cheats, onOpenCheats)
                     RailIcon(Icons.Rounded.Memory, Violet, R.string.nav_controls, onOpenControls)
+                    RailIcon(Icons.Rounded.Add, Dbz.KiBlue, R.string.online_create_button, onCreateRoom)
+                    RailIcon(Icons.Rounded.Public, Dbz.StarRed, R.string.play_online, onOpenOnline)
                     Spacer(Modifier.weight(1f))
                 }
                 // the stage: the art shows through here, and nothing draws on top of it
@@ -186,12 +201,12 @@ fun HomeScreen(
                 Spacer(Modifier.width(8.dp))
                 PlayButton(
                     installed,
-                    stringResource(R.string.play_online_sub),
-                    onOpenOnline,
-                    label = R.string.play_online,
-                    icon = Icons.Rounded.Public,
+                    stringResource(R.string.online_quick_sub),
+                    { vm.onlineFind() },
+                    label = R.string.online_quick,
+                    icon = Icons.Rounded.Bolt,
                     width = 158.dp,
-                    brush = Brush.horizontalGradient(listOf(Violet, Dbz.KiBlue)),
+                    brush = Brush.horizontalGradient(listOf(Dbz.KiBlue, Violet)),
                 )
                 Spacer(Modifier.weight(1f))
                 HudTab(stringResource(R.string.hud_tab_settings), false, onOpenSettings)
@@ -356,6 +371,40 @@ private fun RecordChip(played: Int, won: Int, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+/** A search running from the home screen: what it is doing, and the way to give it up (the online screen has the
+ *  same states; this one is here so quick match does not need the screen at all). */
+@Composable
+private fun OnlineBusy(state: OnlineState, onCancel: () -> Unit) {
+    val text = when (state.phase) {
+        OnlinePhase.SEARCHING -> stringResource(R.string.online_searching, state.waiting, state.queued)
+        OnlinePhase.HOSTING -> stringResource(R.string.online_waiting)
+        OnlinePhase.CONNECTING -> stringResource(R.string.online_connecting)
+        OnlinePhase.FAILED -> state.error
+        else -> stringResource(R.string.online_working)
+    }
+    HudPanel(
+        shape = HudShape(0.05f, 0f),
+        modifier = Modifier.fillMaxWidth(),
+        color = Panel,
+        border = Line,
+        padding = PaddingValues(start = 14.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Bolt, null, Modifier.size(18.dp), tint = Dbz.KiBlue)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (state.phase == OnlinePhase.FAILED) Dbz.StarRed else Dbz.SaiyanGold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.online_cancel)) }
         }
     }
 }

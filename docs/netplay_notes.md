@@ -949,6 +949,11 @@ relay address (it still connects directly).
   (the lobby has the same window).
 - PLAY and the home-screen shortcut clear the session lines (GamePaths.setSessionEnv(null)): only a found match
   writes them. Nothing writes BT3_NET_OPEN any more; the engine's switch stays for anyone who wants it.
+- Quick match is a button of its own on the home screen, where the ONLINE button was: one tap and the queue runs from
+  there, with a line under the profile row saying what it is doing and a Cancel on it (`HomeScreen.OnlineBusy`; the
+  state is the same `AppViewModel.online` the online screen shows, so nothing new was needed underneath). Making a
+  room is a rail button beside it: the wait begins at once and the online screen opens on it, which is where the code
+  is shown. The online screen itself (join with a code, and all three again) is the rail's ONLINE button now.
 - A session that ended used to end the whole process, the desktop way: `relaunch()` execs `/proc/self/exe`, which on
   Android is the app's runtime and not this game, so the game died with signal 11 at address 0 the moment a session
   finished (or was lost) - a launcher match looked as if it "just exited", and the other side saw the packets stop.

@@ -303,4 +303,24 @@
     <string name="renderer_text">Automático: OpenGL ES nas GPUs Mali, Vulkan nas outras (a Adreno roda melhor em Vulkan). O OpenGL ES (experimental) não tem: depth clamp (o que chega muito perto da câmera pode ser cortado) e os filtros de tela (FXAA, FSR, GSR); no present mode, FIFO liga o VSync e os outros desligam. Se o renderizador escolhido não abrir, o jogo usa o outro. Vale na próxima vez que o jogo abrir.</string>
     <string name="err_zip_method">Este zip usa uma compressão que o app não lê (Deflate64, LZMA, BZip2 ou senha). Compacte de novo como .zip normal (\"Deflate\", sem senha), por exemplo no 7-Zip ou no ZArchiver.</string>
     <string name="err_no_textures_seen">Imagens no zip: %1$s.</string>
+<string name="nav_record">Record</string>
+    <string name="online_quick">Partida rápida</string>
+    <string name="online_quick_sub">Encontrar um adversário</string>
+    <string name="record_title">Histórico de batalhas</string>
+    <string name="record_sub">Todas as partidas online que este aparelho terminou</string>
+    <string name="record_played">Jogadas</string>
+    <string name="record_won">Vitórias</string>
+    <string name="record_lost">Derrotas</string>
+    <string name="record_draws">Empates</string>
+    <string name="record_chip">%1$d / %2$d</string>
+    <string name="record_none_yet">Sem partidas</string>
+    <string name="record_result_win">VENCEU</string>
+    <string name="record_result_loss">PERDEU</string>
+    <string name="record_result_draw">EMPATE</string>
+    <string name="record_result_unknown">—</string>
+    <string name="record_ko">Nocaute</string>
+    <string name="record_time_up">Tempo esgotado</string>
+    <string name="record_reason_other">Motivo %1$d</string>
+    <string name="record_empty">Nenhuma partida ainda</string>
+    <string name="record_empty_text">Termine uma partida online e ela fica escrita aqui.</string>
 </resources>
