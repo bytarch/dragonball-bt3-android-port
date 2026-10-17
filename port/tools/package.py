@@ -36,13 +36,13 @@ def version_text():
 
 README = """Dragon Ball Z: Budokai Tenkaichi 3 - PC port (Linux, 64-bit)
 
-1. Start  DBT3   (the launcher: the only program to start)
+1. Start  dbt3-launcher   (the launcher: the only program to start)
 2. Choose your own disc image of the USA release (SLUS-21678), an .iso file, or press Download
    to get it from the project server (Windows, 2.8 GB, deleted once it has been unpacked).
    The setup checks it and unpacks the game's data next to this file. About 4 GB are needed.
-3. Press Play. Later, start  DBT3  again and press Play.
+3. Press Play. Later, start  dbt3-launcher  again and press Play.
 
-The game (DBT3-game) starts only from the launcher. If you start it yourself it says so and stops: it is what the
+The game (DBT3) starts only from the launcher. If you start it yourself it says so and stops: it is what the
 launcher does that keeps the game's data the one this release was made for.
 
 In the game, F1 opens the settings: resolution, widescreen, controls and sound.
@@ -53,7 +53,7 @@ stages/ and songs/: see the note in each folder.
 This package contains no game data. The game's data comes from your disc and stays on your computer.
 """
 
-WIN_README = README.replace("(Linux, 64-bit)", "(Windows, 64-bit)").replace("Start  DBT3  ", "Start  DBT3.exe  ")
+WIN_README = README.replace("(Linux, 64-bit)", "(Windows, 64-bit)").replace("Start  dbt3-launcher   ", "Start  dbt3-launcher.exe   ")
 
 TEXTURES_NOTE = """Texture packs go here.
 
@@ -140,10 +140,10 @@ def bundle_sdl_dependencies(dll, out, lic, prefix):
             "MSYS2 build recipe: https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-libiconv\n")
 
 def main_win():
-    """BT3_CC=win64: bt3.exe (cross-built or built in MSYS2), DBT3-launcher.exe (port/setup/build.sh win), SDL3.dll."""
+    """BT3_CC=win64: bt3.exe (cross-built or built in MSYS2), dbt3-launcher.exe (port/setup/build.sh win), SDL3.dll."""
     import toolchain
     out, zpath = ROOT / "port/build/release-win", ROOT / "port/build/DBT3-windows-x64.zip"
-    exe, setup = ROOT / "port/build/bt3.exe", ROOT / "port/build/DBT3-launcher.exe"
+    exe, setup = ROOT / "port/build/bt3.exe", ROOT / "port/build/dbt3-launcher.exe"
     dll = next((p for p in [toolchain.sdl3() / "bin/SDL3.dll"] if p.exists()), None) if toolchain.sdl3() else None
     if dll is None:
         dll = next((pathlib.Path(d) / "SDL3.dll" for d in os.environ.get("PATH", "").split(os.pathsep) if (pathlib.Path(d) / "SDL3.dll").exists()), None)
@@ -155,7 +155,7 @@ def main_win():
     if out.exists():
         shutil.rmtree(out)
     take_program(exe, out)
-    shutil.copy2(setup, out / (NAME + ".exe"))
+    shutil.copy2(setup, out / (LAUNCH + ".exe"))
     shutil.copy2(dll, out / "SDL3.dll")
     shutil.copy2(ROOT / "port/res/boot_backdrop.jpg", out / "boot_backdrop.jpg")  # the launcher's boot screen
     (out / "version.txt").write_text(version_text())  # what the boot screen compares the server's build against
@@ -172,7 +172,7 @@ def main_win():
         (out / kind).mkdir()
         (out / kind / "README.txt").write_text(note.replace("\n", "\r\n"))
     (lic / "sdl3.txt").write_text("SDL3 (SDL3.dll) is distributed under the zlib license: https://www.libsdl.org/license.php\n")
-    for f in (out / (NAME + ".exe"), out / (GAME + ".exe")):
+    for f in (out / (LAUNCH + ".exe"), out / (NAME + ".exe")):
         subprocess.run([toolchain.PREFIX + "strip", "--strip-debug", str(f)], check=False)
     if zpath.exists():
         zpath.unlink()
@@ -194,7 +194,7 @@ def main():
     if OUT.exists():
         shutil.rmtree(OUT)
     take_program(exe, OUT)
-    shutil.copy2(setup, OUT / NAME)
+    shutil.copy2(setup, OUT / LAUNCH)
     shutil.copy2(ROOT / "port/res/boot_backdrop.jpg", OUT / "boot_backdrop.jpg")  # the launcher's boot screen
     (OUT / "version.txt").write_text(version_text())
     (OUT / "lib").mkdir()
@@ -214,7 +214,7 @@ def main():
         (OUT / kind).mkdir()
         (OUT / kind / "README.txt").write_text(note)
     (lic / "sdl3.txt").write_text("SDL3 (lib/libSDL3.so.0) is distributed under the zlib license: https://www.libsdl.org/license.php\n")
-    for f in (OUT / NAME, OUT / GAME):
+    for f in (OUT / LAUNCH, OUT / NAME):
         subprocess.run(["strip", "--strip-debug", str(f)], check=False)  # the symbol names stay (crash reports use them)
     if ZIP.exists():
         ZIP.unlink()
@@ -234,7 +234,7 @@ def portable(out):
     """Says whether the release would run on other people's machines: no CPU level above the baseline demanded
     or used, and no newer C library than Ubuntu 22.04's (2.35). Build with port/release/build_linux.sh to pass."""
     bad = []
-    for f in (NAME, GAME, "lib/libSDL3.so.0"):
+    for f in (LAUNCH, NAME, "lib/libSDL3.so.0"):
         note = subprocess.run(["readelf", "-n", str(out / f)], capture_output=True, text=True).stdout
         need = next((l.split(":", 1)[1].strip() for l in note.splitlines() if "ISA needed" in l), "")
         if any(v in need for v in ("x86-64-v2", "x86-64-v3", "x86-64-v4")):
