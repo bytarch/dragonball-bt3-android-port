@@ -52,18 +52,7 @@ import com.bytarch.dbt3.ui.theme.TitleStyle
  */
 @Composable
 fun BootScreen(boot: BootState) {
-    Box(Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(R.drawable.boot_backdrop),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-        )
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(listOf(Color(0xF00A0B12), Color(0xA60A0B12))),
-            ),
-        )
+    Box(Modifier.fillMaxSize().stageGlow(Dbz.BallAmber)) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
             val short = maxHeight < 400.dp
             val total = boot.steps.size

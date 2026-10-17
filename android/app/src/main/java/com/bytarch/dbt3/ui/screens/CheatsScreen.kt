@@ -33,7 +33,7 @@ import com.bytarch.dbt3.data.EngineSettings
 import com.bytarch.dbt3.ui.components.DragonBall
 import com.bytarch.dbt3.ui.components.HudHeader
 import com.bytarch.dbt3.ui.components.SectionCard
-import com.bytarch.dbt3.ui.components.stageBackdrop
+import com.bytarch.dbt3.ui.components.stageGlow
 import com.bytarch.dbt3.ui.theme.Dbz
 
 @Composable
@@ -43,7 +43,7 @@ fun CheatsScreen(vm: AppViewModel, onBack: () -> Unit) {
     var confirm by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.stageBackdrop(R.drawable.boot_backdrop, 0.88f)
+        Modifier.stageGlow(Dbz.ShenronGreen)
         .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

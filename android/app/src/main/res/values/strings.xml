@@ -327,7 +327,6 @@
     <string name="renderer_text">Automatic: OpenGL ES on Mali GPUs, Vulkan on the others (Adreno runs Vulkan best). OpenGL ES (experimental) leaves out: depth clamping (what comes very near the camera can be cut off), the screen filters (FXAA, FSR, GSR); present mode FIFO is VSync on, the others off. If the chosen renderer cannot start, the game uses the other one. Takes effect the next time the game starts.</string>
     <string name="err_zip_method">This zip uses a compression the app cannot read (Deflate64, LZMA, BZip2 or a password). Pack it again as a normal .zip (\"Deflate\", no password), for example with 7-Zip or ZArchiver.</string>
     <string name="err_no_textures_seen">Images in the zip: %1$s.</string>
-    <string name="hud_battle">BATTLE !</string>
     <string name="hud_build">BUILD</string>
     <string name="hud_checking">Checking</string>
     <string name="hud_up_to_date">Up to date</string>

@@ -62,7 +62,7 @@ import com.bytarch.dbt3.data.UpdateState
 import com.bytarch.dbt3.data.formatBytes
 import com.bytarch.dbt3.ui.components.HudPanel
 import com.bytarch.dbt3.ui.components.HudShape
-import com.bytarch.dbt3.ui.components.stageBackdrop
+import com.bytarch.dbt3.ui.components.stageGlow
 import com.bytarch.dbt3.ui.theme.Dbz
 
 private val Panel = Color(0xE60D0F1A)
@@ -118,7 +118,7 @@ fun HomeScreen(
         // a phone in landscape is about 360dp tall; on anything shorter the cards tighten rather than overlap
         val tight = maxHeight < 380.dp
 
-        Box(Modifier.fillMaxSize().stageBackdrop(R.drawable.home_backdrop, 0.55f))
+        Box(Modifier.fillMaxSize().stageGlow(Dbz.GiOrangeDeep))
 
         Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp)) {
 
@@ -496,7 +496,7 @@ private fun PlayButton(installed: Boolean, dataLabel: String, onClick: () -> Uni
             Spacer(Modifier.width(6.dp))
             Column {
                 Text(
-                    stringResource(R.string.hud_battle),
+                        stringResource(R.string.play),
                     style = MaterialTheme.typography.titleMedium.copy(shadow = Shadow(Color.Black, Offset(1f, 1f))),
                     fontWeight = FontWeight.Black,
                     fontStyle = FontStyle.Italic,

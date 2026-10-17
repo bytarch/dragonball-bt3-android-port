@@ -1,7 +1,6 @@
 package com.bytarch.dbt3.ui.components
 
 import androidx.compose.foundation.background
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.geometry.Size
@@ -9,8 +8,6 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +43,6 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.paint
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -304,13 +300,6 @@ fun HudPanel(
     }
 }
 
-/** Our own art behind a screen, dimmed so text on top of it still reads. */
-@Composable
-fun Modifier.stageBackdrop(@DrawableRes res: Int, dim: Float = 0.82f): Modifier =
-    paint(painterResource(res), contentScale = ContentScale.Crop)
-        .background(Color.Black.copy(alpha = dim))
-
-
 private val HudBg = Color(0xF00B0D18)
 private val HudLine = Color(0x59FFD54F)
 private val HudMuted = Color(0xFFB9C0D0)
@@ -390,4 +379,45 @@ fun HudChip(label: String, count: Int, active: Boolean, modifier: Modifier = Mod
             )
         }
     }
+}
+
+/** The stage every screen stands on: night, a bloom of ki, the scouter's faint lines and a vignette that pulls the
+ * edges dark so the HUD on top reads. Drawn rather than photographed, so it is the same on every screen, needs no
+ * asset, and never looks like a picture someone else made. */
+@Composable
+fun Modifier.stageGlow(accent: Color = Dbz.GiOrange, glow: Float = 0.60f): Modifier = drawBehind {
+    val w = size.width
+    val h = size.height
+
+    drawRect(Brush.verticalGradient(listOf(Color(0xFF131A30), Color(0xFF0A0C16), Color(0xFF05060A))))
+
+    drawRect(
+        Brush.radialGradient(
+            colors = listOf(accent.copy(alpha = 0.30f), accent.copy(alpha = 0.08f), Color.Transparent),
+            center = Offset(w * 0.5f, h * glow),
+            radius = maxOf(w, h) * 0.72f,
+        ),
+    )
+
+    // the floor the fighters stand on, where the bloom is strongest
+    drawRect(
+        Brush.horizontalGradient(listOf(Color.Transparent, accent.copy(alpha = 0.16f), Color.Transparent)),
+        topLeft = Offset(0f, h * glow),
+        size = Size(w, 2.dp.toPx()),
+    )
+
+    val step = 4.dp.toPx()
+    var y = 0f
+    while (y < h) {
+        drawRect(Color.White.copy(alpha = 0.018f), topLeft = Offset(0f, y), size = Size(w, 1f))
+        y += step
+    }
+
+    drawRect(
+        Brush.radialGradient(
+            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.86f)),
+            center = Offset(w * 0.5f, h * 0.5f),
+            radius = maxOf(w, h) * 0.60f,
+        ),
+    )
 }
