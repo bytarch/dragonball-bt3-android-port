@@ -148,7 +148,15 @@ private fun Dbt3App(vm: AppViewModel) {
                     nav, startDestination = Dest.HOME.route,
                     modifier = Modifier.widthIn(max = 760.dp).fillMaxSize(),
                 ) {
-                    composable(Dest.HOME.route) { HomeScreen(vm) }
+                    composable(Dest.HOME.route) {
+                        HomeScreen(
+                            vm,
+                            onOpenBattlePass = { go(Dest.BATTLEPASS) },
+                            onOpenControls = { go(Dest.CONTROLS) },
+                            onOpenCheats = { go(Dest.CHEATS) },
+                            onOpenSettings = { go(Dest.SETTINGS) },
+                        )
+                    }
                     composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) }
                     composable(Dest.CONTROLS.route) { ControlsScreen(vm) }
                     composable(Dest.CHEATS.route) { CheatsScreen(vm) }

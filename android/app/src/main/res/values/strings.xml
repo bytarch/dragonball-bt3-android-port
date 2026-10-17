@@ -55,6 +55,9 @@
     <string name="bp_buy_premium">BUY PREMIUM PASS</string>
     <string name="bp_premium_note">Nothing to buy yet: the pass is drawn here so you can see what it will be.</string>
     <string name="bp_below_note">What is yours today is below: the packs, mods, stages and songs you have added.</string>
+    <string name="hud_quick">Go to</string>
+    <string name="hud_save_log">Save log</string>
+    <string name="hud_check_update">Check for an update</string>
     <string name="battlepass_title">Battle pass</string>
     <string name="battlepass_sub">Texture packs, mods, stages and songs: everything that changes how the game looks and plays</string>
     <string name="tab_packs">Packs %1$d</string>

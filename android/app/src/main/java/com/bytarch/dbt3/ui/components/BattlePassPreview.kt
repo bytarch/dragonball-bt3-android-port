@@ -3,6 +3,7 @@ package com.bytarch.dbt3.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +49,8 @@ private val Cyan = Color(0xFF2BE8C8)
 private val Ink = Color(0xFF0B0714)
 private val Panel = Color(0xFF1B1030)
 
-/** A box cut on the slant, the way the mock's panels are: the shape leans, the text inside does not. */
+/** A box cut on the slant, the way the mock's panels are: the shape leans, the text inside does not. [onClick] makes
+ * it a control (the lobby's banners and buttons are the same shape). */
 @Composable
 fun SlantedBox(
     color: Color,
@@ -57,6 +59,7 @@ fun SlantedBox(
     border: Color = Ink,
     borderWidth: Float = 3f,
     padding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -64,6 +67,7 @@ fun SlantedBox(
             .graphicsLayer { transformMatrix = Matrix().apply { setSkew(skew, 0f) } }
             .background(color)
             .border(borderWidth.dp, border, RoundedCornerShape(2.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(padding)
             .graphicsLayer { transformMatrix = Matrix().apply { setSkew(-skew, 0f) } },
     ) {
