@@ -34,9 +34,8 @@ done
 # download; ole32 + windowscodecs: the boot screen's picture. The icon and version resource is the game's own
 # (port/res/dbt3.rc), so the launcher looks like the game in the task bar and in the file properties.
 if [ "$1" = win ]; then
-    RES=$O/launcher_res.o
-    $WINDRES -O coff -o $RES port/res/dbt3.rc 2>/dev/null || RES=""
-    $CXX -o $OUT $O/*.o $RES $SDL -Wl,-Bdynamic -lSDL3 -lwinhttp -lole32 -lwindowscodecs -Wl,-Bstatic -lstdc++ -lwinpthread -static-libgcc -mwindows && echo "built $OUT"
+    $WINDRES -O coff -o $O/launcher_res.o port/res/dbt3.rc 2>/dev/null || rm -f $O/launcher_res.o
+    $CXX -o $OUT $O/*.o $SDL -Wl,-Bdynamic -lSDL3 -lwinhttp -lole32 -lwindowscodecs -Wl,-Bstatic -lstdc++ -lwinpthread -static-libgcc -mwindows && echo "built $OUT"
 else
     $CXX -o $OUT $O/*.o $LIBS && echo "built ./$OUT"
 fi
