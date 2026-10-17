@@ -954,6 +954,15 @@ relay address (it still connects directly).
   state is the same `AppViewModel.online` the online screen shows, so nothing new was needed underneath). Making a
   room is a rail button beside it: the wait begins at once and the online screen opens on it, which is where the code
   is shown. The online screen itself (join with a code, and all three again) is the rail's ONLINE button now.
+- **What is happening now, so a player can see whether anybody is about** (`POST /v1/stats`, port/matchmaking/server.py):
+  `{queued, playing, online}` from the tables the service already keeps - the quick-match queue's alive places (the
+  same test it pairs on), the rooms with both players that are younger than a match can be, and the players those
+  two are about (one per waiting place, one per room still waiting, two per room that has both). No presence is kept
+  and nothing new is stored: a player idle longer than a room or a queue place lasts is not counted. The launcher
+  asks for it on every resume and then every fifteen seconds (`AppViewModel.refreshStats`), shows the short form on
+  the home screen (next to the record) and the whole line on the online screen, and simply keeps the numbers at zero
+  against a service that has not been restarted since this POST existed. `check_stats` in the service's own selftest
+  (`python3 server.py --selftest`) is what proves the counts.
 - A session that ended used to end the whole process, the desktop way: `relaunch()` execs `/proc/self/exe`, which on
   Android is the app's runtime and not this game, so the game died with signal 11 at address 0 the moment a session
   finished (or was lost) - a launcher match looked as if it "just exited", and the other side saw the packets stop.

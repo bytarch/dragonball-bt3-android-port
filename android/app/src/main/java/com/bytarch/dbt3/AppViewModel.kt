@@ -133,6 +133,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _record = MutableStateFlow<List<BattleRecord>>(emptyList())
     val record: StateFlow<List<BattleRecord>> = _record.asStateFlow()
 
+    // what the service says is happening now: the queue, the matches, the players
+    private val _stats = MutableStateFlow(MatchLobby.Stats())
+    val stats: StateFlow<MatchLobby.Stats> = _stats.asStateFlow()
+    private var statsJob: Job? = null
+
     fun setRecoveryCode(code: String): Boolean {
         val ok = settings.setRecoveryCode(code)
         if (ok) _recovery.value = settings.recoveryCode()
@@ -318,6 +323,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _boot.value = _boot.value.copy(steps = steps)
     }
 
+    /** The counts the home screen shows ("N online, M in the queue"), asked at once and then every fifteen seconds for
+     *  as long as the launcher is in front (refreshAll is called on every resume). A service that does not answer
+     *  leaves the last numbers it gave: zeros, if it never did. */
+    fun refreshStats() {
+        statsJob?.cancel()
+        statsJob = viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                runCatching { MatchLobby(MatchLobby.service(paths.root)).stats() }.onSuccess { _stats.value = it }
+                delay(15_000)
+            }
+        }
+    }
+
     fun refreshAll() {
         viewModelScope.launch(Dispatchers.IO) {
             _packs.value = packs.list()
@@ -328,6 +346,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _settings.value = settings.snapshot()
             _touch.value = touchStore.load() // (the game's own quick menu may have changed it)
             _record.value = BattleRecord.read(paths.root) // (the game appends a line when a battle is decided)
+            refreshStats()
         }
     }
 

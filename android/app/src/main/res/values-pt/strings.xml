@@ -306,6 +306,8 @@
 <string name="nav_record">Record</string>
     <string name="online_quick">Partida rápida</string>
     <string name="online_quick_sub">Encontrar um adversário</string>
+    <string name="online_population">%1$d online · %2$d esperando</string>
+    <string name="online_population_full">%1$d jogador(es) online · %2$d esperando adversário · %3$d numa partida</string>
     <string name="record_title">Histórico de batalhas</string>
     <string name="record_sub">Todas as partidas online que este aparelho terminou</string>
     <string name="record_played">Jogadas</string>

@@ -103,6 +103,7 @@ fun HomeScreen(
     val playerName by vm.playerName.collectAsStateWithLifecycle()
     val record by vm.record.collectAsStateWithLifecycle()
     val online by vm.online.collectAsStateWithLifecycle()
+    val stats by vm.stats.collectAsStateWithLifecycle()
     // a room of this player's own: the wait begins at once, the online screen is where its code is shown
     val onCreateRoom = { vm.onlineHost(); onOpenOnline() }
     val code by vm.recoveryCode.collectAsStateWithLifecycle()
@@ -147,6 +148,8 @@ fun HomeScreen(
                 )
                 Spacer(Modifier.width(8.dp))
                 RecordChip(record.size, record.count { it.won == true }, onOpenRecord)
+                Spacer(Modifier.width(8.dp))
+                QueueChip(stats.queued, stats.online, onOpenOnline)
                 Spacer(Modifier.width(8.dp))
                 UpdateChip(update, onCheck = { vm.checkForUpdate(true) })
                 Spacer(Modifier.width(8.dp))
@@ -368,6 +371,38 @@ private fun RecordChip(played: Int, won: Int, onClick: () -> Unit) {
                 fontWeight = FontWeight.Black,
                 fontStyle = FontStyle.Italic,
                 color = Dbz.SaiyanGold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** What the service says is going on, next to the record: how many players it can see, and how many of them are
+ *  waiting for an opponent. Tapping it is the way to quick match. */
+@Composable
+private fun QueueChip(queued: Int, online: Int, onClick: () -> Unit) {
+    HudPanel(
+        shape = HudShape(0.05f, 0f),
+        color = Panel,
+        border = Line,
+        padding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        onClick = onClick,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.Bolt,
+                stringResource(R.string.online_population),
+                Modifier.size(18.dp),
+                tint = if (queued > 0) Dbz.ShenronGreen else Muted,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                stringResource(R.string.online_population, online, queued),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                fontStyle = FontStyle.Italic,
+                color = if (queued > 0) Dbz.SaiyanGold else Muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

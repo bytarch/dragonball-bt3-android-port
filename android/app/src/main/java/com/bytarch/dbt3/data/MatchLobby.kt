@@ -114,6 +114,17 @@ class MatchLobby(service: String) {
         runCatching { post("qcancel", JSONObject().put("key", key)) }
     }
 
+    /** What the service can say about right now (POST /v1/stats, port/matchmaking/server.py): [queued] places in the
+     * quick-match queue whose owners are still asking, [playing] rooms that have both players, [online] the players
+     * those two are about. A service without that POST (an older one) answers "bad request" and the numbers stay at
+     * zero: it is a line on the screen, not something the app needs. */
+    data class Stats(val queued: Int = 0, val playing: Int = 0, val online: Int = 0)
+
+    suspend fun stats(): Stats {
+        val answer = post("stats", JSONObject())
+        return Stats(answer.optInt("queued"), answer.optInt("playing"), answer.optInt("online"))
+    }
+
     private fun queueAnswer(answer: JSONObject): QueueAnswer {
         val pair = if (answer.optInt("matched") != 0)
             QueuePair(

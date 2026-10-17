@@ -46,6 +46,7 @@ import com.bytarch.dbt3.ui.theme.Dbz
 @Composable
 fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
     val state by vm.online.collectAsStateWithLifecycle()
+    val stats by vm.stats.collectAsStateWithLifecycle()
     val idle = state.phase == OnlinePhase.IDLE
     var code by remember { mutableStateOf("") }
 
@@ -55,6 +56,13 @@ fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HudHeader(stringResource(R.string.play_online), stringResource(R.string.online_subtitle), onBack)
+
+        // what the service can see right now, before anything is pressed: whether anybody is about
+        Text(
+            stringResource(R.string.online_population_full, stats.online, stats.queued, stats.playing),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         SectionCard(stringResource(R.string.online_find), icon = Icons.Rounded.Bolt) {
             Text(
