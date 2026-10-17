@@ -75,7 +75,10 @@ jobs:
           else
             echo "DR_VERSION_NAME=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           fi
-          echo "DR_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          # The version code is the date, not the run number: a workflow file's counter starts again whenever the
+          # file is replaced, and a build whose code is below the one already installed can never be put on a phone
+          # (Android refuses a downgrade), so a reset counter would freeze every player on whatever they had.
+          echo "DR_VERSION_CODE=$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
 
       - name: Signing key
         env:
