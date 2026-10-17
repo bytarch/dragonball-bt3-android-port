@@ -70,6 +70,29 @@ private val Crimson = Color(0xFF7A0B1E)
 private val Steel = Color(0xFF1C2230)
 private val Ink = Color(0xFF0B0A10)
 
+@Composable
+private fun GridButton(
+    modifier: Modifier,
+    icon: ImageVector,
+    label: Int,
+    onClick: () -> Unit,
+    skew: Float = 0.18f,
+) {
+    SlantedBox(Steel, modifier = modifier.height(46.dp), skew = skew, borderWidth = 2f, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(18.dp), tint = Dbz.SaiyanGold)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(label),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 /**
  * The lobby, the way a mobile game opens: who you are at the top, what you have in the middle, one big control at the
  * bottom. It does not scroll — the phone is held in landscape and everything fits, and a home screen that scrolls is
@@ -277,28 +300,5 @@ fun HomeScreen(
             },
             dismissButton = { TextButton(onClick = { codeDialog = false }) { Text(stringResource(R.string.close)) } },
         )
-    }
-}
-
-@Composable
-private fun GridButton(
-    modifier: Modifier,
-    icon: ImageVector,
-    label: Int,
-    onClick: () -> Unit,
-    skew: Float = 0.18f,
-) {
-    SlantedBox(Steel, modifier = modifier.height(46.dp), skew = skew, borderWidth = 2f, onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(18.dp), tint = Dbz.SaiyanGold)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stringResource(label),
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
     }
 }
