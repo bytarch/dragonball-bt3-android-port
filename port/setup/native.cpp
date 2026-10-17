@@ -25,11 +25,11 @@ namespace {
 const char *kRomSha1 = "caee6c2269bba89fc51eea9e7beac3adbec9dc52";
 const char *kDbzpSha1 = "4f910969e05d9b25c83af7642b60da9949a4348b";
 const Uint32 kRomBase = 0x100000, kRomEnd = 0x2FF180;
-// The launcher (DBT3) sets this up; the program it launches is DBT3-game, with its data list beside it.
+// The launcher (dbt3-launcher) sets this up; the program it launches is DBT3, with its data list beside it.
 #ifdef _WIN32
-const char *kGame = "DBT3-game.exe";
+const char *kGame = "DBT3.exe";
 #else
-const char *kGame = "DBT3-game";
+const char *kGame = "DBT3";
 #endif
 
 std::mutex sLock;

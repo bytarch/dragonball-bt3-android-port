@@ -7,9 +7,9 @@
    BT3_CC=win64 python3 port/tools/package.py   (after the win64 build and `port/setup/build.sh win`)
                                           -> port/build/release-win/ and port/build/DBT3-windows-x64.zip
 
-Contents:  DBT3               the launcher: the one program a player starts. It checks the build at start, sets the
+Contents:  dbt3-launcher        the launcher: the one program a player starts. It checks the build at start, sets the
                               game up from the user's own disc image (or from the project server) and plays it
-   DBT3-game, .mem, .dat      the game, without the data tables of the original programs (strip_data.py). On Windows
+   DBT3, .mem, .dat          the game, without the data tables of the original programs (strip_data.py). On Windows
                               it only starts through the launcher (BT3_LAUNCH, src/main.c)
    lib/                       SDL3, so that it does not have to be installed
    README.txt, licenses/
@@ -18,8 +18,8 @@ import os, pathlib, re, shutil, subprocess, sys, zipfile
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-NAME = "DBT3"  # the launcher, and the name a release carries on its window
-GAME = "DBT3-game"  # the program the launcher plays, with its data list: GAME, GAME.exe, GAME.dat, GAME.mem
+LAUNCH = "dbt3-launcher"  # the launcher, and the name it carries on its window
+NAME = "DBT3"  # the program the launcher plays, with its data list: NAME, NAME.exe, NAME.dat, NAME.mem
 OUT = ROOT / "port/build/release"
 ZIP = ROOT / "port/build/DBT3-linux-x64.zip"
 
@@ -92,7 +92,7 @@ def take_program(exe, out):
     tables (port/data) is that already; one built with the tables' values has them taken out by strip_data.py."""
     import toolchain
     out.mkdir(parents=True)
-    name = GAME + ".exe" if exe.suffix == ".exe" else GAME
+    name = NAME + ".exe" if exe.suffix == ".exe" else NAME
     # where the game's own variables lie in the program (make_state.py, at link time): the program reads it from
     # beside itself to save and restore its state, which an online session is built on
     mem = pathlib.Path(str(exe) + ".mem")
@@ -104,7 +104,7 @@ def take_program(exe, out):
         if not dat.exists():
             sys.exit(f"missing {dat.name}: link.py makes it")
         shutil.copy2(exe, out / name)
-        shutil.copy2(dat, out / (GAME + ".dat"))
+        shutil.copy2(dat, out / (NAME + ".dat"))
         print("program built from the blank data tables (no disc involved)")
         return
     r = subprocess.run([sys.executable, str(ROOT / "port/tools/strip_data.py"), "--exe", str(exe), "--out", str(out)], capture_output=True, text=True)
@@ -112,7 +112,7 @@ def take_program(exe, out):
     if r.returncode or "NOT matched" in r.stdout:
         sys.exit("strip_data.py failed or left game data in the program: not packaging\n" + r.stderr)
     (out / ("bt3.exe" if exe.suffix == ".exe" else "bt3")).rename(out / name)  # strip_data.py writes bt3 and bt3.dat
-    (out / "bt3.dat").rename(out / (GAME + ".dat"))
+    (out / "bt3.dat").rename(out / (NAME + ".dat"))
 
 def bundle_sdl_dependencies(dll, out, lic, prefix):
     """MSYS2 SDL can import libiconv; the official SDL archive is self-contained.

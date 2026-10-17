@@ -75,7 +75,7 @@ extern volatile u32 gPortDataStripped;
 s32 main(void) {
 #ifdef _WIN32
     if (gPortDataStripped == 1 && getenv("BT3_LAUNCH") == NULL) {
-        fprintf(stderr, "This is the game's own program. Start DBT3 instead: it is the launcher, in this folder.\n");
+        fprintf(stderr, "This is the game's own program. Start dbt3-launcher instead: it is the launcher, in this folder.\n");
         return 1;
     }
 #endif

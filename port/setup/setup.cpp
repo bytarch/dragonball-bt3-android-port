@@ -22,9 +22,9 @@
 #include "native.h"
 #include "net.h"
 
-#define LAUNCH "DBT3"      /* this program: the launcher, and the one a player starts */
-#define GAME "DBT3-game"   /* the program it launches: GAME, GAME.exe, GAME.dat (the engine's list is named after
-                            * the program it belongs to, so these three names always travel together) */
+#define LAUNCH "dbt3-launcher" /* this program: the launcher, and the one a player starts */
+#define GAME "DBT3"  /* the program it launches: GAME, GAME.exe, GAME.dat (the engine's list is named after the
+                        * program it belongs to, so these three names always travel together) */
 
 // The project's own server: the disc image to set the game up from, and the build feed read at every start.
 #define kIsoUrl "https://gcode.bytarch.com/DBT3-MOBILE.iso"
@@ -179,8 +179,8 @@ static void pump_update(void) {
         return;
     }
     sNotice = "Build " + sFeed.version + " is downloaded: DBT3-windows-x64.zip, next to this program. Close the game, "
-              "then unpack the zip over this folder (it replaces DBT3.exe, DBT3-game.exe and their files) and start "
-              "DBT3 again.";
+              "then unpack the zip over this folder (it replaces DBT3.exe, dbt3-launcher.exe and their files) and start "
+              "dbt3-launcher again.";
     SDL_OpenURL(("file://" + sRoot).c_str());
     sPage = PAGE_PICK;
 }
@@ -340,22 +340,41 @@ static void style() {
     ImGuiStyle &st = ImGui::GetStyle();
     ImGui::StyleColorsDark();
     st.WindowRounding = 0.0f;
-    st.FrameRounding = 6.0f;
-    st.GrabRounding = 6.0f;
-    st.WindowPadding = ImVec2(28.0f, 22.0f);
-    st.FramePadding = ImVec2(12.0f, 8.0f);
-    st.ItemSpacing = ImVec2(10.0f, 10.0f);
+    st.ChildRounding = 12.0f;  // the cards
+    st.FrameRounding = 8.0f;
+    st.PopupRounding = 10.0f;
+    st.GrabRounding = 8.0f;
+    st.WindowPadding = ImVec2(34.0f, 26.0f);
+    st.FramePadding = ImVec2(14.0f, 9.0f);
+    st.ItemSpacing = ImVec2(12.0f, 12.0f);
+    st.ItemSpacing.y = 10.0f;
     st.WindowBorderSize = 0.0f;
+    st.ScrollbarSize = 10.0f;
     ImVec4 *c = st.Colors;
     c[ImGuiCol_WindowBg] = ImVec4(0.07f, 0.08f, 0.11f, 1.0f);
+    c[ImGuiCol_ChildBg] = ImVec4(0.10f, 0.11f, 0.15f, 0.72f); // a card over the artwork, not a flat form
     c[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.17f, 0.23f, 1.0f);
     c[ImGuiCol_FrameBgHovered] = ImVec4(0.21f, 0.24f, 0.32f, 1.0f);
     c[ImGuiCol_FrameBgActive] = ImVec4(0.26f, 0.29f, 0.38f, 1.0f);
-    c[ImGuiCol_Button] = ImVec4(0.17f, 0.20f, 0.27f, 1.0f);
+    c[ImGuiCol_Button] = ImVec4(0.19f, 0.22f, 0.30f, 1.0f);
     c[ImGuiCol_ButtonHovered] = ImVec4(0.96f, 0.55f, 0.13f, 0.55f);
     c[ImGuiCol_ButtonActive] = kAccent;
     c[ImGuiCol_PlotHistogram] = kAccent;
     c[ImGuiCol_TextSelectedBg] = ImVec4(0.96f, 0.55f, 0.13f, 0.35f);
+    c[ImGuiCol_TextDisabled] = ImVec4(0.42f, 0.45f, 0.52f, 1.0f);
+    ImGui::GetIO().FontGlobalScale = 1.0f;
+}
+
+// The artwork and the wash over it, on every page: what makes this read as a launcher's window and not a form.
+static void backdrop(void) {
+    if (sBackdrop == NULL) {
+        return;
+    }
+    ImVec2 size = ImGui::GetIO().DisplaySize;
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    dl->AddImage(sBackdrop, ImVec2(0.0f, 0.0f), size);
+    dl->AddRectFilled(ImVec2(0.0f, 0.0f), size, ImGui::GetColorU32(ImVec4(0.04f, 0.05f, 0.08f, 0.72f)));
+    dl->AddRectFilled(ImVec2(0.0f, 0.0f), ImVec2(size.x, size.y * 0.5f), ImGui::GetColorU32(ImVec4(0.04f, 0.05f, 0.08f, 0.35f)));
 }
 
 // ---------------------------------------------------------------------------------------------- the engine script
@@ -564,29 +583,42 @@ static void SDLCALL dialog_done(void *userdata, const char *const *files, int fi
 }
 
 static void heading(const char *title, const char *sub) {
-    ImGui::PushFont(NULL, 30.0f);
+    ImGui::Dummy(ImVec2(0.0f, 14.0f));
+    ImGui::PushFont(NULL, 34.0f);
     ImGui::TextUnformatted(title);
     ImGui::PopFont();
-    ImGui::PushStyleColor(ImGuiCol_Text, kDim);
-    ImGui::TextWrapped("%s", sub);
-    ImGui::PopStyleColor();
+    ImGui::TextColored(kDim, "%s", sub);
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
 }
 
-static bool big_button(const char *label, bool primary, bool enabled = true) {
+static bool big_button(const char *label, bool primary, bool enabled = true, float width = 150.0f, float height = 40.0f) {
     bool pressed;
     if (primary) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.96f, 0.55f, 0.13f, 0.90f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.63f, 0.22f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.96f, 0.55f, 0.13f, 0.92f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.66f, 0.26f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.08f, 0.06f, 0.03f, 1.0f));
     }
     ImGui::BeginDisabled(!enabled);
-    pressed = ImGui::Button(label, ImVec2(150.0f, 40.0f));
+    pressed = ImGui::Button(label, ImVec2(width, height));
     ImGui::EndDisabled();
     if (primary) {
         ImGui::PopStyleColor(3);
     }
     return pressed;
+}
+
+// A panel over the artwork: the steps, the status, the settings all sit in one.
+static bool card(const char *id, ImVec2 size, float pad = 20.0f) {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.09f, 0.10f, 0.14f, 0.82f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
+    bool open = ImGui::BeginChild(id, size, ImGuiChildFlags_AlwaysUseWindowPadding);
+    ImGui::PopStyleVar(1);
+    return open;
+}
+
+static void end_card(void) {
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 // Buttons of a page sit on one line at the bottom right.
@@ -641,20 +673,23 @@ static void pump_download(void) {
 }
 
 static void page_boot(void) {
-    ImVec2 size = ImGui::GetIO().DisplaySize;
-    ImDrawList *dl = ImGui::GetBackgroundDrawList();
-    if (sBackdrop != NULL) {
-        dl->AddImage(sBackdrop, ImVec2(0.0f, 0.0f), size); // stretched over the window: a splash, not a picture frame
-        dl->AddRectFilled(ImVec2(0.0f, size.y * 0.30f), size, ImGui::GetColorU32(ImVec4(0.04f, 0.05f, 0.08f, 0.88f)));
+    // the artwork and the wash are already on every page (backdrop(), in build_ui)
+    ImGui::Dummy(ImVec2(0.0f, 40.0f));
+    ImGui::PushFont(NULL, 40.0f);
+    ImGui::TextUnformatted("DBT3");
+    ImGui::PopFont();
+    ImGui::TextColored(kDim, "%s", sVersion.empty() ? "Getting the game ready" : ("Getting the game ready  ·  build " + sVersion).c_str());
+    ImGui::Dummy(ImVec2(0.0f, 14.0f));
+    if (card("boot", ImVec2(-FLT_MIN, 0.0f), 22.0f)) {
+        step_list(sBoot);
     }
-    heading(LAUNCH, sVersion.empty() ? "Getting the game ready" : ("Getting the game ready  ·  build " + sVersion).c_str());
-    step_list(sBoot);
+    end_card();
     int done = 0;
     for (size_t i = 0; i < sBoot.size(); i++) {
         done += sBoot[i].state != PENDING && sBoot[i].state != RUNNING;
     }
-    ImGui::Dummy(ImVec2(0.0f, 4.0f));
-    ImGui::ProgressBar((float)done / (float)(sBoot.empty() ? 1 : sBoot.size()), ImVec2(-FLT_MIN, 8.0f), "");
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+    ImGui::ProgressBar((float)done / (float)(sBoot.empty() ? 1 : sBoot.size()), ImVec2(-FLT_MIN, 6.0f), "");
     ImGui::TextColored(kDim, "Please wait...");
     if (!update_ready() && !sUpdateDownloading) {
         return;
@@ -690,46 +725,56 @@ static void page_pick() {
     static const SDL_DialogFileFilter filters[] = {{"PS2 disc image", "iso;bin;img"}, {"All files", "*"}};
     bool ok = file_exists(sIso);
 
-    heading(LAUNCH, "This sets the game up on your computer from your own PlayStation 2 disc.");
+    ImGui::Dummy(ImVec2(0.0f, 18.0f));
+    ImGui::PushFont(NULL, 34.0f);
+    ImGui::TextUnformatted("Set up the game");
+    ImGui::PopFont();
+    ImGui::TextColored(kDim, "%s", "The game's data comes from your own PlayStation 2 disc, and stays on this computer.");
     if (!sNotice.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, kGreen);
         ImGui::TextWrapped("%s", sNotice.c_str());
         ImGui::PopStyleColor();
         sNotice.clear();
     }
-    ImGui::TextWrapped("Choose your disc image of Dragon Ball Z: Budokai Tenkaichi 3, USA release (SLUS-21678), as an .iso file. "
-                       "The game's data is taken from it and stays on this computer. %s",
-                       sRelease ? "Nothing is downloaded." : "Nothing is downloaded except one small tool.");
-    ImGui::Dummy(ImVec2(0.0f, 10.0f));
-    ImGui::TextUnformatted("Disc image");
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 130.0f);
-    ImGui::InputTextWithHint("##iso", "drop the file on this window, or browse", sIso, sizeof(sIso));
-    ImGui::SameLine();
-    if (ImGui::Button("Browse...", ImVec2(120.0f, 0.0f))) {
-        SDL_ShowOpenFileDialog(dialog_done, NULL, sWindow, filters, 2, NULL, false);
-    }
-    if (sIso[0] != '\0' && !ok) {
-        ImGui::TextColored(kRed, "That file does not exist.");
-    } else if (sRoot.empty()) {
-        ImGui::TextColored(kRed, "Neither the game (" GAME ", " GAME ".dat) nor install.py was found next to this program.");
-    } else {
-        ImGui::TextColored(kDim, sRelease ? "Needs about 4 GB of free space and takes a minute or two." : "Needs about 4 GB of free space and takes 5 to 10 minutes.");
-    }
-    ImGui::Dummy(ImVec2(0.0f, 10.0f));
-    ImGui::TextWrapped("Or take the image from the project server instead: 2.8 GB, and it is deleted once the game "
-                       "data is unpacked. Windows only (the Linux build links no HTTPS library).");
-    if (big_button("Download", false, !sRoot.empty() && !Dl_Active())) {
-        reset_rows();
-        std::string error;
-        if (Dl_Start(kIsoUrl, sRoot + "DBT3-MOBILE.iso", error)) {
-            sIsoDownloaded = true;
-            sDownloading = true;
-            sError.clear();
-            sPage = PAGE_RUN;
+    ImGui::Dummy(ImVec2(0.0f, 8.0f));
+
+    if (card("pick", ImVec2(-FLT_MIN, 0.0f), 22.0f)) {
+        ImGui::TextColored(kDim, "Disc image");
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 130.0f);
+        ImGui::InputTextWithHint("##iso", "drop the file on this window, or browse", sIso, sizeof(sIso));
+        ImGui::SameLine();
+        if (ImGui::Button("Browse...", ImVec2(120.0f, 0.0f))) {
+            SDL_ShowOpenFileDialog(dialog_done, NULL, sWindow, filters, 2, NULL, false);
+        }
+        if (sIso[0] != '\0' && !ok) {
+            ImGui::TextColored(kRed, "That file does not exist.");
+        } else if (sRoot.empty()) {
+            ImGui::TextColored(kRed, "Neither the game (" GAME ", " GAME ".dat) nor install.py was found next to this program.");
         } else {
-            sError = error;
+            ImGui::TextWrapped("Your disc image of the USA release (SLUS-21678), an .iso file. %s %s",
+                               sRelease ? "Nothing is downloaded." : "Nothing is downloaded except one small tool.",
+                               sRelease ? "Needs about 4 GB of free space and takes a minute or two."
+                                        : "Needs about 4 GB of free space and takes 5 to 10 minutes.");
+        }
+        ImGui::Dummy(ImVec2(0.0f, 6.0f));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(0.0f, 6.0f));
+        ImGui::TextWrapped("No disc image at hand? Take it from the project server: 2.8 GB, deleted once the game data "
+                           "is unpacked. Windows only (the Linux build links no HTTPS library).");
+        if (big_button("Download", false, !sRoot.empty() && !Dl_Active(), 190.0f, 42.0f)) {
+            reset_rows();
+            std::string error;
+            if (Dl_Start(kIsoUrl, sRoot + "DBT3-MOBILE.iso", error)) {
+                sIsoDownloaded = true;
+                sDownloading = true;
+                sError.clear();
+                sPage = PAGE_RUN;
+            } else {
+                sError = error;
+            }
         }
     }
+    end_card();
     bottom_row(2);
     if (big_button("Close", false)) {
         sQuit = true;
@@ -797,7 +842,10 @@ static void page_run() {
     heading(sDownloading ? "Downloading" : "Setting up",
             sDownloading ? "You can leave this running; Cancel stops it and a part-downloaded image is deleted."
                          : "You can leave this running. Finished steps are kept if it is interrupted.");
-    step_list(sRows);
+    if (card("run", ImVec2(-FLT_MIN, 0.0f))) {
+        step_list(sRows);
+    }
+    end_card();
     for (auto &r : sRows) {
         done += r.state == OK || r.state == SKIPPED;
     }
@@ -822,43 +870,73 @@ static void page_run() {
     }
 }
 
-static void page_done() {
-    char sub[128];
-    if (sRunEnd > sRunStart) {
-        snprintf(sub, sizeof(sub), "The game is installed and its demo fight ran correctly.  (%d min %d s)", (int)((sRunEnd - sRunStart) / 60000),
-                 (int)((sRunEnd - sRunStart) / 1000 % 60));
-    } else {
-        snprintf(sub, sizeof(sub), "The game is installed.");
+// The game process: what the launcher is for. It starts the program with the variables it needs, and the launcher
+// closes behind it.
+static void play_game(void) {
+    if (sLauncher.empty()) {
+        return;
     }
-    heading("Ready to play", sub);
-    step_list(sRows);
-    ImGui::Dummy(ImVec2(0.0f, 4.0f));
-    ImGui::TextColored(kDim, "In the game, F1 opens the settings: resolution, widescreen, controls and sound.");
-    bottom_row(2);
-    if (big_button("Close", false)) {
+    const char *args[2] = {sLauncher.c_str(), NULL};
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_Environment *env = SDL_CreateEnvironment(true);
+    SDL_SetEnvironmentVariable(env, "BT3_GS", "gpu", true); // the window and the GPU renderer
+    SDL_SetEnvironmentVariable(env, "BT3_LAUNCH", "1", true); // a release game only starts from here (src/main.c)
+    SDL_UnsetEnvironmentVariable(env, "BT3_DEMO");
+    SDL_UnsetEnvironmentVariable(env, "BT3_REPLAY");
+    SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void *)args);
+    SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, env);
+    SDL_SetStringProperty(props, SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING, sRoot.c_str());
+    SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+    SDL_Process *game = SDL_CreateProcessWithProperties(props);
+    SDL_DestroyProcess(props);
+    SDL_DestroyEnvironment(env);
+    if (game != NULL) {
+        SDL_DestroyProcess(game);
         sQuit = true;
     }
-    ImGui::SameLine();
-    if (big_button("Play", true)) {
-        const char *args[2] = {sLauncher.c_str(), NULL};
-        SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_Environment *env = SDL_CreateEnvironment(true);
-        SDL_SetEnvironmentVariable(env, "BT3_GS", "gpu", true); // the window and the GPU renderer
-        SDL_SetEnvironmentVariable(env, "BT3_LAUNCH", "1", true); // a release game only starts from here (see src/main.c)
-        SDL_UnsetEnvironmentVariable(env, "BT3_DEMO");
-        SDL_UnsetEnvironmentVariable(env, "BT3_REPLAY");
-        SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void *)args);
-        SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, env);
-        SDL_SetStringProperty(props, SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING, sRoot.c_str());
-        SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
-        SDL_Process *game = SDL_CreateProcessWithProperties(props);
-        SDL_DestroyProperties(props);
-        SDL_DestroyEnvironment(env);
-        if (game != NULL) {
-            SDL_DestroyProcess(game);
+}
+
+// The home page: the game's name over its own artwork, what is installed, and one big Play.
+static void page_done(void) {
+    char sub[128];
+    if (sRunEnd > sRunStart) {
+        snprintf(sub, sizeof(sub), "Installed \302\267 the demo fight ran correctly \302\267 %d min %d s",
+                 (int)((sRunEnd - sRunStart) / 60000), (int)((sRunEnd - sRunStart) / 1000 % 60));
+    } else {
+        snprintf(sub, "%s", "Installed and ready.");
+    }
+    ImGui::Dummy(ImVec2(0.0f, 24.0f));
+    ImGui::PushFont(NULL, 54.0f);
+    ImGui::TextUnformatted("DRAGON BALL");
+    ImGui::PopFont();
+    ImGui::PushFont(NULL, 26.0f);
+    ImGui::TextColored(kAccent, "BUDOKAI TENKAICHI 3");
+    ImGui::PopFont();
+    ImGui::Dummy(ImVec2(0.0f, 16.0f));
+    if (card("hero", ImVec2(-FLT_MIN, 186.0f), 24.0f)) {
+        ImGui::TextColored(kGreen, "%s", sub);
+        ImGui::TextColored(kDim, "%s", sVersion.empty() ? "the PC port" : ("build " + sVersion).c_str());
+        ImGui::Dummy(ImVec2(0.0f, 6.0f));
+        ImGui::TextColored(kDim, "In the game, F1 opens the settings: resolution, widescreen, controls and sound.");
+        ImGui::Dummy(ImVec2(0.0f, 10.0f));
+        if (big_button("Play", true, !sLauncher.empty(), 210.0f, 50.0f)) {
+            play_game();
+        }
+        ImGui::SameLine();
+        if (big_button("Set up again", false, true, 170.0f, 50.0f)) {
+            sPage = PAGE_PICK;
+        }
+        ImGui::SameLine();
+        if (big_button("Close", false, true, 140.0f, 50.0f)) {
             sQuit = true;
         }
     }
+    end_card();
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+    if (card("donesteps", ImVec2(-FLT_MIN, 0.0f))) {
+        step_list(sRows);
+    }
+    end_card();
 }
 
 static void page_failed() {
@@ -899,8 +977,10 @@ static void build_ui() {
     ImGuiIO &io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(io.DisplaySize);
-    if (sPage == PAGE_BOOT) {
+    bool art = sBackdrop != NULL;
+    if (art) {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // the artwork shows through
+        backdrop();
     }
     ImGui::Begin("setup", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
     switch (sPage) {
@@ -911,7 +991,7 @@ static void build_ui() {
     case PAGE_FAILED: page_failed(); break;
     }
     ImGui::End();
-    if (sPage == PAGE_BOOT) {
+    if (art) {
         ImGui::PopStyleColor();
     }
 }
