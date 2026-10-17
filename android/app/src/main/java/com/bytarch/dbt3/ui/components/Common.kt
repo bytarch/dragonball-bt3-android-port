@@ -364,7 +364,7 @@ fun HudHeader(title: String, subtitle: String? = null, onBack: () -> Unit, modif
 
 /** A tab along a screen's top, in the HUD's style: the one you are on is gold, the rest are grey. */
 @Composable
-fun HudChip(label: String, count: Int, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun HudChip(label: String, count: Int, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
         modifier
             .clip(HudShape(0.12f, 0.12f))
