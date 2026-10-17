@@ -274,9 +274,8 @@ Image Img_Load(const std::string &path) {
             img.width = img.height = 0;
         } else {
             WICRect rect = {0, 0, img.width, img.height};
-            // (rect, x, y, lines, buffer size, buffer): the picture is drawn opaque, so straight RGBA is what the
-            // texture wants
-            if (FAILED(converter->CopyPixels(&rect, 0, 0, (UINT)img.height, (UINT)img.width * img.height * 4, img.rgba))) {
+            // (rect, buffer size, buffer): the picture is drawn opaque, so straight RGBA is what the texture wants
+            if (FAILED(converter->CopyPixels(&rect, (UINT)img.width * img.height * 4, img.rgba))) {
                 free(img.rgba);
                 img.rgba = NULL;
                 img.width = img.height = 0;
