@@ -930,6 +930,12 @@ relay address (it still connects directly).
   open a path (both behind a symmetric NAT, say) is told to use the in-game lobby, which has the relay. Rules are
   the game's defaults (single battle, 240 seconds: BT3_NET_RULES=768) - the in-game lobby's rules window is where a
   match is set up differently.
+- Quick match is on the same screen, and is the queue the game's own lobby uses (net_match.c, role 3: POST /v1/queue
+  every two seconds, /v1/qcancel when the wait is given up, ~4 minutes before it gives up). The service pairs a
+  waiting player with whoever arrives and gives the room to the one that waited, so the launcher takes the room's
+  role from the answer (matched 1 hosts, 2 joins), and the pair it is told is the room it gives up once the two
+  machines have a path. The waiting player takes a relay address and publishes it into its queue entry there; not
+  here, for the reason above, so a pair made this way is a direct one.
 - PLAY and the home-screen shortcut clear the session lines (GamePaths.setSessionEnv(null)): only a found match
   writes them. Nothing writes BT3_NET_OPEN any more; the engine's switch stays for anyone who wants it.
 - Not tried yet: two devices with this build, a real pairing.

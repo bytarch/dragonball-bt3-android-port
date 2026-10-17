@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material3.FilledTonalButton
@@ -39,8 +40,9 @@ import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.components.stageBackdrop
 import com.bytarch.dbt3.ui.theme.Dbz
 
-/** The launcher's online screen: make a room, or join one. The looking happens here; the game opens only when the
- * other player is found and the two machines have a path to each other (MatchLobby, AppViewModel). */
+/** The launcher's online screen: find an opponent in the queue, or make a room and give out its code. The looking
+ * happens here; the game opens only when the other player is found and the two machines have a path to each other
+ * (MatchLobby, AppViewModel). */
 @Composable
 fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
     val state by vm.online.collectAsStateWithLifecycle()
@@ -53,6 +55,19 @@ fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HudHeader(stringResource(R.string.play_online), stringResource(R.string.online_subtitle), onBack)
+
+        SectionCard(stringResource(R.string.online_find), icon = Icons.Rounded.Bolt) {
+            Text(
+                stringResource(R.string.online_find_note),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FilledTonalButton(onClick = { vm.onlineFind() }, enabled = idle) {
+                Icon(Icons.Rounded.Bolt, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.online_find_button))
+            }
+        }
 
         SectionCard(stringResource(R.string.online_create), icon = Icons.Rounded.Add) {
             Text(
@@ -93,6 +108,7 @@ fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
             SectionCard(
                 when (state.phase) {
                     OnlinePhase.WORKING -> stringResource(R.string.online_working)
+                    OnlinePhase.SEARCHING -> stringResource(R.string.online_searching, state.waiting, state.queued)
                     OnlinePhase.HOSTING -> stringResource(R.string.online_waiting)
                     OnlinePhase.CONNECTING -> stringResource(R.string.online_connecting)
                     else -> stringResource(R.string.online_failed)

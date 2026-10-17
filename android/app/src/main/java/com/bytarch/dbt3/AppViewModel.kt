@@ -59,9 +59,9 @@ import kotlin.coroutines.cancellation.CancellationException
 /** A long operation in progress (shown as a bar with its text). */
 data class Busy(val title: String, val detail: String = "")
 
-/** One step of the launcher's room flow: idle, busy with the service, hosting (its code shown), opening a path to
- * the player found, or failed with something to say. */
-enum class OnlinePhase { IDLE, WORKING, HOSTING, CONNECTING, FAILED }
+/** One step of the launcher's room flow: idle, busy with the service, waiting in the quick-match queue, hosting (its
+ * code shown), opening a path to the player found, or failed with something to say. */
+enum class OnlinePhase { IDLE, WORKING, SEARCHING, HOSTING, CONNECTING, FAILED }
 
 /** The online screen's state (AppViewModel.online). */
 data class OnlineState(
@@ -69,6 +69,8 @@ data class OnlineState(
     val code: String = "",
     val peer: String = "",
     val error: String = "",
+    val waiting: Int = 0,
+    val queued: Int = 0,
 )
 
 /** What a boot check has got to: not reached yet, being done now, or done. */
@@ -661,9 +663,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The launcher's way into a match: find the other player here, then start the game straight into it. The
      * engine's own lobby (with its relay, for lines that cannot go direct) stays as it is. */
-    fun onlineHost() = findOpponent(host = true, code = "")
+    fun onlineHost() = findOpponent(quick = false, host = true, code = "")
 
-    fun onlineJoin(code: String) = findOpponent(host = false, code = code.trim().uppercase())
+    fun onlineJoin(code: String) = findOpponent(quick = false, host = false, code = code.trim().uppercase())
+
+    /** Quick match: the service's queue, the same one the game's own lobby uses (net_match.c, role 3). */
+    fun onlineFind() = findOpponent(quick = true, host = false, code = "")
 
     fun onlineCancel() {
         onlineJob?.cancel()
@@ -671,14 +676,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _online.value = OnlineState()
     }
 
-    private fun findOpponent(host: Boolean, code: String) {
+    private fun findOpponent(quick: Boolean, host: Boolean, code: String) {
         when {
             _install.value !is InstallState.Installed -> say(str(R.string.msg_install_first))
             !engineAvailable -> say(str(R.string.msg_no_engine))
-            !host && code.isEmpty() -> Unit
+            !quick && !host && code.isEmpty() -> Unit
             onlineJob?.isActive == true -> Unit
             else -> {
-                _online.value = OnlineState(OnlinePhase.WORKING)
+                _online.value = OnlineState(if (quick) OnlinePhase.SEARCHING else OnlinePhase.WORKING)
                 onlineJob = viewModelScope.launch {
                     val lobby = MatchLobby(MatchLobby.service(paths.root))
                     try {
@@ -686,7 +691,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val addrs = withContext(Dispatchers.IO) { listOf(lobby.publicAddr(), lobby.lanAddr()) }
                             .filter { it.isNotEmpty() }
                         if (addrs.isEmpty()) throw IOException(str(R.string.online_no_internet))
-                        if (host) {
+                        if (quick) {
+                            // the queue gives the room to whoever waited, so this side hosts only when it was first
+                            val pair = withContext(Dispatchers.IO) {
+                                lobby.quickMatch(name, addrs, 260_000) { ahead, total ->
+                                    _online.value = OnlineState(OnlinePhase.SEARCHING, waiting = ahead, queued = total)
+                                }
+                            } ?: throw IOException(str(R.string.online_nobody))
+                            beginMatch(lobby, pair.peer, host = pair.matched == 1, room = pair.code to pair.key)
+                        } else if (host) {
                             val (room, key) = withContext(Dispatchers.IO) { lobby.host(name, addrs) }
                             onlineRoom = room to key
                             _online.value = OnlineState(OnlinePhase.HOSTING, code = room)
@@ -713,6 +726,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         onlineRoom = null
                         // the room has done its work (or the wait was given up): give it back, even on a cancel
                         if (room != null) runCatching { withContext(NonCancellable) { lobby.leave(room.first, room.second) } }
+                        runCatching { withContext(NonCancellable) { lobby.queueGiveUp() } }
                         runCatching { lobby.socket.close() }
                     }
                 }
@@ -720,11 +734,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** The other player is known: find which of their addresses really answers, then hand the match to the engine. */
-    private suspend fun beginMatch(lobby: MatchLobby, peer: MatchLobby.Peer, host: Boolean) {
+    /** The other player is known: find which of their addresses really answers, then hand the match to the engine.
+     * [room] is the room the service made for the pair, when it made one; it is given up before the game starts. */
+    private suspend fun beginMatch(lobby: MatchLobby, peer: MatchLobby.Peer, host: Boolean, room: Pair<String, String>? = null) {
         _online.value = OnlineState(OnlinePhase.CONNECTING, peer = peer.name)
         val wire = withContext(Dispatchers.IO) { lobby.probe(peer.addrs, 20_000) }
             ?: throw IOException(str(R.string.online_unreachable))
+        if (room != null) withContext(Dispatchers.IO) { lobby.leave(room.first, room.second) }
         val port = lobby.localPort
         lobby.socket.close() // the engine binds this same port in a moment: see the class comment on MatchLobby
         startMatch(port, wire, host)
@@ -772,6 +788,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 "no room" -> str(R.string.online_no_room)
                 "full" -> str(R.string.online_full)
                 "busy" -> str(R.string.online_busy)
+                "busy matches" -> str(R.string.online_busy_matches)
+                "bad request" -> str(R.string.online_bad_request)
+                "no room to give" -> str(R.string.online_no_room_to_give)
+                "no waiting" -> str(R.string.online_nobody)
                 else -> str(R.string.online_failed)
             }
         }

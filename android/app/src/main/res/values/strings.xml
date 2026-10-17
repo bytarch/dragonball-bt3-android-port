@@ -28,6 +28,14 @@
     <string name="online_code">Room code</string>
     <string name="online_code_note">Give this code to the other player</string>
     <string name="online_join_button">Join</string>
+    <string name="online_find">Find an opponent</string>
+    <string name="online_find_note">The service pairs you with whoever is waiting for the same game. The game itself opens only once there is somebody to play.</string>
+    <string name="online_find_button">FIND OPPONENT</string>
+    <string name="online_searching">Searching: %1$d waiting, %2$d in the queue</string>
+    <string name="online_nobody">Nobody was waiting to be paired. Try again in a moment, or make a room with a code.</string>
+    <string name="online_busy_matches">This address has made too many quick matches this hour.</string>
+    <string name="online_bad_request">The matchmaking service would not accept this build\'s request.</string>
+    <string name="online_no_room_to_give">The matchmaking service had no room to give right now.</string>
     <string name="online_working">Asking the matchmaking service…</string>
     <string name="online_waiting">Room open: waiting for the other player</string>
     <string name="online_connecting">Player found: opening a path</string>

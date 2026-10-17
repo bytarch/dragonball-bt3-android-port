@@ -27,6 +27,14 @@
     <string name="online_code">Código da sala</string>
     <string name="online_code_note">Dê este código ao outro jogador</string>
     <string name="online_join_button">Entrar</string>
+    <string name="online_find">Encontrar um adversário</string>
+    <string name="online_find_note">O serviço te emparelha com quem estiver esperando o mesmo jogo. O jogo em si só abre quando houver alguém para jogar.</string>
+    <string name="online_find_button">ENCONTRAR ADVERSÁRIO</string>
+    <string name="online_searching">Procurando: %1$d esperando, %2$d na fila</string>
+    <string name="online_nobody">Ninguém estava esperando para o pareamento. Tente de novo daqui a pouco, ou crie uma sala com um código.</string>
+    <string name="online_busy_matches">Este endereço já fez partidas rápidas demais nesta hora.</string>
+    <string name="online_bad_request">O serviço de matchmaking não aceitou o pedido deste build.</string>
+    <string name="online_no_room_to_give">O serviço de matchmaking não tinha sala para dar agora.</string>
     <string name="online_working">Falando com o serviço de matchmaking…</string>
     <string name="online_waiting">Sala aberta: esperando o outro jogador</string>
     <string name="online_connecting">Jogador encontrado: abrindo um caminho</string>

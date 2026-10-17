@@ -7,12 +7,13 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.SocketTimeoutException
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Matchmaking with room codes, from the launcher: the same service the game's own lobby talks to
- * (port/matchmaking; every answer is documented at the top of worker.js), and the same trick the lobby plays before a
+ * Matchmaking from the launcher, with a room code or the quick-match queue (the two ways the service pairs players,
+ * port/matchmaking; every answer is documented at the top of worker.js), and the same trick the lobby plays before a
  * session begins (port/src/gs/net.c, net_match.c):
  *
  *   - one UDP socket is kept for the whole wait; the match is begun on the port it had, so the routers on the way
@@ -65,6 +66,54 @@ class MatchLobby(service: String) {
     suspend fun join(code: String, name: String, addrs: List<String>): Peer {
         val answer = post("join", JSONObject().put("v", VERSION).put("code", code).put("name", name).put("addrs", JSONArray(addrs)))
         return peerOf(answer.optJSONObject("peer")) ?: throw IOException("no peer")
+    }
+
+    /** What one answer of the quick-match queue says. */
+    data class QueueAnswer(val key: String, val ahead: Int, val total: Int, val pair: QueuePair?)
+
+    /** A pair the queue made: [matched] is which side of it this player took (1 waited and hosts, 2 arrived and joins),
+     * and [code]/[key] are the room the service made for the pair. */
+    data class QueuePair(val matched: Int, val code: String, val key: String, val peer: Peer)
+
+    /** The place in the queue this side is in while it waits: given up when the wait ends (AppViewModel). */
+    var queueKey: String? = null
+        private set
+
+    /** Quick match: waits in the service's queue until it pairs this side with somebody, or [giveUpMs] passes with
+     * nobody waiting (null then). [onWaiting] carries the numbers the service reports while waiting. The pair is the
+     * same as a room the service made for us: the waiting player hosts, this player joins when it arrived second. */
+    suspend fun quickMatch(name: String, addrs: List<String>, giveUpMs: Long, onWaiting: (ahead: Int, total: Int) -> Unit): QueuePair? {
+        var answer = queueAnswer(post("queue", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs))))
+        var waited = 0L
+        while (answer.pair == null && waited < giveUpMs) {
+            queueKey = answer.key
+            onWaiting(answer.ahead, answer.total)
+            delay(2000)
+            waited += 2000
+            answer = queueAnswer(post("queue", JSONObject().put("key", answer.key)))
+        }
+        queueKey = null // the place is gone: what is left is a room
+        return answer.pair
+    }
+
+    /** Gives the place in the queue up (best effort: a pair already made is left alone, and the service forgets a
+     * waiting player that stops asking). */
+    suspend fun queueGiveUp() {
+        val key = queueKey ?: return
+        queueKey = null
+        runCatching { post("qcancel", JSONObject().put("key", key)) }
+    }
+
+    private fun queueAnswer(answer: JSONObject): QueueAnswer {
+        val pair = if (answer.optInt("matched") != 0)
+            QueuePair(
+                answer.getInt("matched"),
+                answer.getString("code"),
+                answer.getString("key"),
+                peerOf(answer.optJSONObject("peer")) ?: throw IOException("no peer"),
+            )
+        else null
+        return QueueAnswer(answer.optString("key", ""), answer.optInt("waiting"), answer.optInt("queue"), pair)
     }
 
     /** Gives the room up (best effort: it also runs out on its own once the host stops asking). */
