@@ -956,4 +956,7 @@ relay address (it still connects directly).
   returns when one ends, `ended()` and the two-minute wait return from `net_start` rather than `exit(2)`, and the
   unwind the caller already does (state.c: the kept state, `Gs_StateBack`, the resync) finishes the return.
   (A pair that cannot be reached still goes through the in-game lobby, which has the relay.)
-- Not tried yet: two devices with this build, a real pairing.
+- Tried and working (2026-10-17, dev.66): a pairing between a PC running the game (its own online screen) and the
+  Android launcher, both ways - the launcher's greeting is the one the game's lobby answers, so the two find each
+  other exactly as two games do (the text probe the launcher first used could only ever be answered by a launcher).
+- Not tried yet: a whole match's worth on this pairing (playing it out, the record, the return to the menu).
