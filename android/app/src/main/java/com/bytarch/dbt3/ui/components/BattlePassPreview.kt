@@ -29,8 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Matrix
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -38,6 +39,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Size
 import androidx.compose.ui.unit.dp
 import com.bytarch.dbt3.R
 import com.bytarch.dbt3.ui.theme.Dbz
@@ -49,27 +53,43 @@ private val Cyan = Color(0xFF2BE8C8)
 private val Ink = Color(0xFF0B0714)
 private val Panel = Color(0xFF1B1030)
 
-/** A box cut on the slant, the way the mock's panels are: the shape leans, the text inside does not. [onClick] makes
- * it a control (the lobby's banners and buttons are the same shape). */
+/** The mock's panels are cut on the slant. As a shape rather than a transform, so the text inside stays upright and
+ * the outline follows the cut. [skew] is the lean as a fraction of the height (0.18 is about ten degrees). */
+private class SlantShape(private val skew: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val dx = skew * size.height
+        val path = Path().apply {
+            moveTo(0f, size.height)
+            lineTo(dx, 0f)
+            lineTo(size.width, 0f)
+            lineTo(size.width + dx, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+/** A box cut on the slant, the way the mock's panels are. [onClick] makes it a control (the lobby's banners and
+ * buttons are the same shape). */
 @Composable
 fun SlantedBox(
     color: Color,
     modifier: Modifier = Modifier,
-    skew: Float = -0.16f,
+    skew: Float = 0.18f,
     border: Color = Ink,
     borderWidth: Float = 3f,
     padding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 7.dp),
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val shape = SlantShape(skew)
     Box(
         modifier
-            .graphicsLayer { transformMatrix = Matrix().apply { setSkew(skew, 0f) } }
+            .clip(shape)
             .background(color)
-            .border(borderWidth.dp, border, RoundedCornerShape(2.dp))
+            .border(borderWidth.dp, border, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(padding)
-            .graphicsLayer { transformMatrix = Matrix().apply { setSkew(-skew, 0f) } },
+            .padding(padding),
     ) {
         content()
     }
