@@ -66,10 +66,16 @@ static bool request(const std::string &url, Sink sink, void *ctx, long long *don
         ok = false;
     }
     DWORD status = 0, length = 0, size = sizeof(status);
-    if (ok && (!WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status,
-                                    &size, WINHTTP_NO_HEADER_INDEX) ||
-               status < 200 || status > 299)) {
+    bool haveStatus = ok && WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                                WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX) != FALSE;
+    if (ok && (!haveStatus || status < 200 || status > 299)) {
         ok = false;
+        // the status, not GetLastError(): after a 404 the last error is 0 and "network error 0" says nothing
+        if (haveStatus) {
+            char text[64];
+            snprintf(text, sizeof(text), "HTTP %lu", (unsigned long)status);
+            error = text;
+        }
     }
     size = sizeof(length);
     if (ok && WinHttpQueryHeaders(req, WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &length,
