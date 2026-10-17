@@ -888,7 +888,7 @@ static void play_game(void) {
     SDL_SetStringProperty(props, SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING, sRoot.c_str());
     SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
     SDL_Process *game = SDL_CreateProcessWithProperties(props);
-    SDL_DestroyProcess(props);
+    SDL_DestroyProperties(props);
     SDL_DestroyEnvironment(env);
     if (game != NULL) {
         SDL_DestroyProcess(game);
@@ -900,10 +900,10 @@ static void play_game(void) {
 static void page_done(void) {
     char sub[128];
     if (sRunEnd > sRunStart) {
-        snprintf(sub, sizeof(sub), "Installed \302\267 the demo fight ran correctly \302\267 %d min %d s",
+        snprintf(sub, sizeof(sub), "Installed · the demo fight ran correctly · %d min %d s",
                  (int)((sRunEnd - sRunStart) / 60000), (int)((sRunEnd - sRunStart) / 1000 % 60));
     } else {
-        snprintf(sub, "%s", "Installed and ready.");
+        snprintf(sub, sizeof(sub), "%s", "Installed and ready.");
     }
     ImGui::Dummy(ImVec2(0.0f, 24.0f));
     ImGui::PushFont(NULL, 54.0f);
