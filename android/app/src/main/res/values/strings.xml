@@ -45,6 +45,16 @@
     <string name="boot_please_wait">Please wait…</string>
 
     <string name="nav_battlepass">Battle pass</string>
+    <string name="bp_season">SEASON 1</string>
+    <string name="bp_coming_soon">Coming soon</string>
+    <string name="bp_season_note">Levels, rewards and the season clock arrive with the first season.</string>
+    <string name="bp_center_placeholder">Reward stage</string>
+    <string name="bp_requires_premium">REQUIRES PREMIUM PASS</string>
+    <string name="bp_unlocks_tier">UNLOCKS AT TIER 5</string>
+    <string name="bp_tier">TIER %1$d</string>
+    <string name="bp_buy_premium">BUY PREMIUM PASS</string>
+    <string name="bp_premium_note">Nothing to buy yet: the pass is drawn here so you can see what it will be.</string>
+    <string name="bp_below_note">What is yours today is below: the packs, mods, stages and songs you have added.</string>
     <string name="battlepass_title">Battle pass</string>
     <string name="battlepass_sub">Texture packs, mods, stages and songs: everything that changes how the game looks and plays</string>
     <string name="tab_packs">Packs %1$d</string>

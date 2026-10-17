@@ -2,7 +2,10 @@ package com.bytarch.dbt3.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -46,7 +49,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +65,7 @@ import com.bytarch.dbt3.data.ExtraKind
 import com.bytarch.dbt3.data.FileMod
 import com.bytarch.dbt3.data.TexturePack
 import com.bytarch.dbt3.data.formatBytes
+import com.bytarch.dbt3.ui.components.BattlePassPreview
 import com.bytarch.dbt3.ui.components.EmptyState
 import com.bytarch.dbt3.ui.components.ScreenTitle
 import com.bytarch.dbt3.ui.components.SectionCard
@@ -89,8 +96,21 @@ fun BattlePassScreen(vm: AppViewModel) {
     var rename by remember { mutableStateOf<Pair<ExtraKind, ExtraItem>?>(null) }
     var downloading by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize()) {
-        ScreenTitle(
+    Box(Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.battlepass_bg),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        // the wash that keeps the panels and the text readable over it
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(listOf(Color(0xE60A0B12), Color(0xB30A0B12))),
+            ),
+        )
+        Column(Modifier.fillMaxSize()) {
+            ScreenTitle(
             stringResource(R.string.battlepass_title),
             stringResource(R.string.battlepass_sub),
             Modifier.padding(horizontal = 16.dp),
@@ -106,6 +126,7 @@ fun BattlePassScreen(vm: AppViewModel) {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item { BattlePassPreview() }
             when (tab) {
                 0 -> {
                     item {
@@ -205,6 +226,7 @@ fun BattlePassScreen(vm: AppViewModel) {
                     }
                 }
             }
+        }
         }
     }
 

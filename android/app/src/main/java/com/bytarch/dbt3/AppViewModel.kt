@@ -210,6 +210,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val boot: StateFlow<BootState> = _boot.asStateFlow()
     private var bootJob: Job? = null
 
+    /** How long each stage holds the screen before the next one starts. A check that lands in 20 ms is not something
+        a player sees: this is what makes five lines read as five stages of one load. The screen is BootScreen.kt. */
+    private companion object {
+        const val BOOT_FILES_MS = 350L
+        const val BOOT_DATA_MS = 600L
+        const val BOOT_ENGINE_MS = 450L
+        const val BOOT_SERVER_MS = 900L
+        const val BOOT_VERSION_MS = 500L
+        const val BOOT_MIN_MS = 2800L
+    }
+
     /**
      * The launch checks, in the order a game does them: storage first (nothing works without it), then the unpacked
      * data, the engine, the server, and whether this is the newest build. Nothing here blocks the app — a failed check
@@ -234,7 +245,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val writable = withContext(Dispatchers.IO) { paths.ensure(); paths.root.canWrite() }
             val free = withContext(Dispatchers.IO) { formatBytes(paths.root.usableSpace) }
             step(0, detail = if (writable) str(R.string.boot_free, free) else str(R.string.boot_no_storage), state = if (writable) StepState.Ok else StepState.Fail)
-            delay(120)
+            delay(BOOT_FILES_MS)
 
             // the game's data: the marker the installer leaves behind, which is also what the engine starts from
             step(1, state = StepState.Working)
@@ -246,22 +257,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else str(R.string.boot_no_data),
                 state = if (data is InstallState.Installed) StepState.Ok else StepState.Warn,
             )
-            delay(120)
+            delay(BOOT_DATA_MS)
 
             // the engine itself: the native library has to be in the build or there is nothing to play
             step(2, state = StepState.Working)
             step(2, detail = str(if (engineAvailable) R.string.boot_ready else R.string.boot_no_engine), state = if (engineAvailable) StepState.Ok else StepState.Warn)
-            delay(120)
+            delay(BOOT_ENGINE_MS)
 
             // the server, and with it the newest build: no connection is not fatal, the game is all local
             step(3, state = StepState.Working)
             step(4, state = StepState.Working)
+            delay(BOOT_SERVER_MS)
             val feed = withContext(Dispatchers.IO) { runCatching { BuildFeed.fetch() }.getOrNull() }
             if (feed == null) {
                 step(3, detail = str(R.string.boot_offline), state = StepState.Warn)
                 step(4, detail = str(R.string.boot_offline), state = StepState.Warn)
             } else {
                 step(3, detail = str(R.string.boot_online), state = StepState.Ok)
+                delay(BOOT_VERSION_MS)
                 if (feed.newerThan(BuildConfig.VERSION_CODE)) {
                     // the update dialog (UpdateDialog) takes it from here, once the boot screen is gone
                     _update.value = UpdateState.Available(UpdateInfo(feed.version, feed.notes, feed.apkUrl, feed.size, false))
@@ -272,7 +285,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             // never a flash of a screen the player cannot read
-            val left = 1400L - (SystemClock.elapsedRealtime() - started)
+            val left = BOOT_MIN_MS - (SystemClock.elapsedRealtime() - started)
             if (left > 0) delay(left)
             _boot.value = _boot.value.copy(done = true)
         }

@@ -195,14 +195,20 @@ static void boot_begin() {
     sBoot[0].state = RUNNING;
 }
 
-// One step per frame: a game never hangs on one, and the window keeps drawing and closing.
+// How long each stage holds the screen before the next one starts (the same numbers the phone app uses): a check that
+// lands in 20 ms is not something a player sees, and five lines appearing at once are not five stages.
+static const Uint32 kStageMs[] = {350, 600, 450, 900, 500};
+static const Uint32 kBootMinMs = 2800;
+static Uint64 sBootNext; // when the next stage may start
+
+// One stage per visit, never more than one per frame, and never before the one before it has had its beat.
 static void boot_tick(void) {
     if (sPage != PAGE_BOOT) {
         return;
     }
     if (sBootStep >= (int)sBoot.size()) {
         // every check has landed: the page is held just long enough to read, then the one the player came for
-        if (SDL_GetTicks() - sBootStart < 1400) {
+        if (SDL_GetTicks() - sBootStart < kBootMinMs) {
             return;
         }
         sPage = sRelease && !sRoot.empty() && Native_Installed(sRoot) ? PAGE_DONE : PAGE_PICK;
@@ -215,6 +221,9 @@ static void boot_tick(void) {
             sLauncher = sRoot + (file_exists((sRoot + GAME ".exe").c_str()) ? GAME ".exe" : GAME);
         }
         return;
+    }
+    if (SDL_GetTicks() < sBootNext) {
+        return; // the stage that just landed is still on screen
     }
     StepRow &r = sBoot[sBootStep];
     switch (sBootStep) {
@@ -261,6 +270,7 @@ static void boot_tick(void) {
     }
     }
     r.end = SDL_GetTicks();
+    sBootNext = SDL_GetTicks() + (sBootStep < (int)(sizeof(kStageMs) / sizeof(kStageMs[0])) ? kStageMs[sBootStep] : 0);
     sBootStep++;
     if (sBootStep < (int)sBoot.size()) {
         sBoot[sBootStep].state = RUNNING;
