@@ -26,8 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -113,55 +112,54 @@ private fun Dbt3App(vm: AppViewModel) {
     }
 
     val colors = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxSize().background(colors.background).kiBackground(colors.primary, colors.secondary)) {
-        if (wide) {
-            NavigationRail(containerColor = Color.Transparent, modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
-                Dest.entries.forEach { d ->
-                    NavigationRailItem(
-                        selected = current == d.route, onClick = { go(d) },
-                        icon = { Icon(d.icon, null) }, label = { Text(stringResource(d.label)) },
-                    )
-                }
-            }
-        }
-        Scaffold(
-            containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbar) },
-            bottomBar = {
-                Column {
-                    BusyBar(busy)
-                    if (!wide) {
-                        NavigationBar(containerColor = colors.surfaceContainer.copy(alpha = 0.92f)) {
-                            Dest.entries.forEach { d ->
-                                NavigationBarItem(
-                                    selected = current == d.route, onClick = { go(d) },
-                                    icon = { Icon(d.icon, null) }, label = { Text(stringResource(d.label), maxLines = 1) },
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-        ) { pad ->
-            Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.TopCenter) {
-                NavHost(
-                    nav, startDestination = Dest.HOME.route,
-                    modifier = Modifier.widthIn(max = 760.dp).fillMaxSize(),
+    Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier.background(colors.background).kiBackground(colors.primary, colors.secondary),
+        snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            Column {
+                BusyBar(busy)
+                // the dock: one row, always at the bottom, the way a game keeps its controls under your thumbs
+                NavigationBar(
+                    containerColor = colors.surfaceContainer.copy(alpha = 0.95f),
+                    tonalElevation = 0.dp,
                 ) {
-                    composable(Dest.HOME.route) {
-                        HomeScreen(
-                            vm,
-                            onOpenBattlePass = { go(Dest.BATTLEPASS) },
-                            onOpenControls = { go(Dest.CONTROLS) },
-                            onOpenCheats = { go(Dest.CHEATS) },
-                            onOpenSettings = { go(Dest.SETTINGS) },
+                    Dest.entries.forEach { d ->
+                        val on = current == d.route
+                        NavigationBarItem(
+                            selected = on,
+                            onClick = { go(d) },
+                            icon = { Icon(d.icon, null, Modifier.size(if (on) 26.dp else 22.dp)) },
+                            label = { Text(stringResource(d.label), maxLines = 1, style = MaterialTheme.typography.labelSmall) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = colors.onPrimaryContainer,
+                                selectedTextColor = colors.primary,
+                                indicatorColor = colors.primaryContainer,
+                            ),
                         )
                     }
-                    composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) }
-                    composable(Dest.CONTROLS.route) { ControlsScreen(vm) }
-                    composable(Dest.CHEATS.route) { CheatsScreen(vm) }
-                    composable(Dest.SETTINGS.route) { SettingsScreen(vm) }
                 }
+            }
+        },
+    ) { pad ->
+        Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.TopCenter) {
+            NavHost(
+                nav, startDestination = Dest.HOME.route,
+                modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize(),
+            ) {
+                composable(Dest.HOME.route) {
+                    HomeScreen(
+                        vm,
+                        onOpenBattlePass = { go(Dest.BATTLEPASS) },
+                        onOpenControls = { go(Dest.CONTROLS) },
+                        onOpenCheats = { go(Dest.CHEATS) },
+                        onOpenSettings = { go(Dest.SETTINGS) },
+                    )
+                }
+                composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) }
+                composable(Dest.CONTROLS.route) { ControlsScreen(vm) }
+                composable(Dest.CHEATS.route) { CheatsScreen(vm) }
+                composable(Dest.SETTINGS.route) { SettingsScreen(vm) }
             }
         }
     }
