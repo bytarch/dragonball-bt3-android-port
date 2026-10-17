@@ -758,7 +758,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * one, so the path then exists even through a NAT that hides both machines). */
     private suspend fun beginMatch(lobby: MatchLobby, peer: MatchLobby.Peer, host: Boolean, room: Pair<String, String>? = null) {
         _online.value = OnlineState(OnlinePhase.CONNECTING, peer = peer.name)
-        val wire = withContext(Dispatchers.IO) { lobby.probe(peer.addrs, 20_000) }
+        val wire = withContext(Dispatchers.IO) { lobby.probe(peer.addrs, 20_000, host = host) }
             ?: peer.relay.ifEmpty { throw IOException(str(R.string.online_unreachable)) }
         if (room != null) withContext(Dispatchers.IO) { lobby.leave(room.first, room.second) }
         val port = lobby.localPort
@@ -807,6 +807,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * side's own message (no internet, unreachable) and is shown as it stands. */
     private fun onlineError(e: Exception): String {
         val text = e.message.orEmpty()
+        if (text == "version") return str(R.string.online_version) // the greeting's own word (MatchLobby.probe)
         val json = runCatching { org.json.JSONObject(text) }.getOrNull()
         if (json != null) {
             return when (json.optString("error")) {

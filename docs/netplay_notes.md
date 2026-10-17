@@ -922,14 +922,14 @@ relay address (it still connects directly).
   then stun.l.google.com) says the address the internet sees that socket under; that address, the LAN address and
   the netcode version (3) go to the room service (https://dbt3-server.bytarch.com, or match_url.txt if present);
   the other player's addresses come back from /v1/join or /v1/poll. Instead of trusting that list, the launcher
-  probes the candidates over the socket (small dbt3-launcher-ping/pong datagrams) and uses the address a packet
-  really arrived from - the same thing the engine's lobby learns from the greeting (sCodePunch, net.c:1585). Only
-  then is the socket closed (the engine re-binds the same local port on purpose, so the routers keep taking the
-  session for the conversation they saw) and the game started.
-- Direct connections only: relay=/seen= entries are ignored and no TURN address is asked for, so a pair that cannot
-  open a path (both behind a symmetric NAT, say) is told to use the in-game lobby, which has the relay. Rules are
-  the game's defaults (single battle, 240 seconds: BT3_NET_RULES=768) - the in-game lobby's rules window is where a
-  match is set up differently.
+  speaks the lobby's own greeting over the socket - the same "BT3N" bytes, the same T_HELLO / T_PUNCH / T_HELLO_ACK
+  exchange and the same version byte a running game uses (MatchLobby.probe) - and uses the address a packet really
+  arrived from; the same thing the engine's lobby learns (sCodePunch, net.c:1585). A launcher and a running game
+  (whose lobby is the other side of the exchange) pair this way as easily as two launchers. Only then is the socket
+  closed (the engine re-binds the same local port on purpose, so the routers keep taking the session for the
+  conversation they saw) and the game started.
+- Rules are the game's defaults (single battle, 240 seconds: BT3_NET_RULES=768) - the in-game lobby's rules window is
+  where a match is set up differently.
 - Quick match is on the same screen, and is the queue the game's own lobby uses (net_match.c, role 3: POST /v1/queue
   every two seconds, /v1/qcancel when the wait is given up, ~4 minutes before it gives up). The service pairs a
   waiting player with whoever arrives and gives the room to the one that waited, so the launcher takes the room's

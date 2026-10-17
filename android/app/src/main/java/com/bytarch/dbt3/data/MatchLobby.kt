@@ -19,12 +19,12 @@ import org.json.JSONObject
  *     keep taking the session for the conversation they already saw;
  *   - STUN says which address and port the internet sees that socket under; that, the local address (two players
  *     behind one router) and the netcode version are what the service is told;
- *   - when the other player is known, a few probes over the socket find the address that really answers, and the
- *     engine is started with that address in its environment (BT3_NET_HOST / BT3_NET_JOIN, read at boot by net.c) -
- *     it opens the match itself, with no game running before it.
+ *   - when the other player is known, the lobby's greeting (the same "BT3N" bytes a running game sends - see probe)
+ *     finds the address that really answers, and the engine is started with that address in its environment
+ *     (BT3_NET_HOST / BT3_NET_JOIN, read at boot by net.c) - it opens the match itself, with no game running before it.
  *
- * Direct connections only: when the two machines cannot open a path to each other, the game's own lobby (with its
- * relay) is the way.
+ * A launcher and a running game can pair this way as easily as two launchers or two games; when nothing direct answers,
+ * the hosting side's relayed address is used (the game's own lobby remains the way when that is not enough either).
  */
 class MatchLobby(service: String) {
     /** The socket the service's answer and the probes go through. The engine binds this same port at session start. */
@@ -247,12 +247,16 @@ class MatchLobby(service: String) {
         runCatching { post("leave", JSONObject().put("code", code).put("key", key)) }
     }
 
-    /** Sends probes to [addrs] (and answers the other side's) until one arrives; the address a packet arrives FROM is
-     * the one this side really sees the other under - the address the engine must be told, not the one the service
-     * said. Blocks for at most [timeoutMs] and answers null then. */
-    fun probe(addrs: List<String>, timeoutMs: Long): String? {
-        val ping = PROBE_PING.toByteArray(Charsets.US_ASCII)
-        val pong = PROBE_PONG.toByteArray(Charsets.US_ASCII)
+    /** Sends the lobby's own greeting to [addrs] (and answers the other side's) until one arrives; the address a
+     * packet arrives FROM is the one this side really sees the other under - the address the engine must be told, not
+     * the one the service said. The host only knocks (T_PUNCH, to open its own router) and answers a greeting with
+     * three acknowledgements; the one joining greets until an acknowledgement arrives. The same bytes the game's own
+     * lobby uses (net.c: "BT3N", the type, the netcode version at the eighth byte), so a launcher and a running game
+     * find each other here exactly as two games do. Blocks for at most [timeoutMs] and answers null then. */
+    fun probe(addrs: List<String>, timeoutMs: Long, host: Boolean): String? {
+        val hello = greeting(T_HELLO, 12)
+        val ack = greeting(T_HELLO_ACK, 12)
+        val punch = greeting(T_PUNCH, 8)
         socket.soTimeout = 200
         val deadline = System.nanoTime() + timeoutMs * 1_000_000
         var nextSend = 0L
@@ -262,8 +266,9 @@ class MatchLobby(service: String) {
                 for (a in addrs) {
                     val at = a.lastIndexOf(':')
                     if (at < 1) continue
+                    val bytes = if (host) punch else hello
                     runCatching {
-                        socket.send(DatagramPacket(ping, ping.size, InetAddress.getByName(a.substring(0, at)), a.substring(at + 1).toInt()))
+                        socket.send(DatagramPacket(bytes, bytes.size, InetAddress.getByName(a.substring(0, at)), a.substring(at + 1).toInt()))
                     }
                 }
                 nextSend = now + 400_000_000
@@ -275,16 +280,45 @@ class MatchLobby(service: String) {
             } catch (e: SocketTimeoutException) {
                 continue
             }
-            val text = String(rx, 0, packet.length, Charsets.US_ASCII)
-            if (text.startsWith(PROBE_PING)) {
-                runCatching { socket.send(DatagramPacket(pong, pong.size, packet.address, packet.port)) }
-                return "${packet.address.hostAddress}:${packet.port}"
-            }
-            if (text.startsWith(PROBE_PONG)) {
-                return "${packet.address.hostAddress}:${packet.port}"
+            when (typeOf(rx, packet.length)) {
+                T_HELLO -> {
+                    if (!host || !versionAt(rx, packet.length)) continue // another release knocking: the game waits too
+                    runCatching { repeat(3) { socket.send(DatagramPacket(ack, ack.size, packet.address, packet.port)) } }
+                    return "${packet.address.hostAddress}:${packet.port}"
+                }
+                T_HELLO_ACK -> {
+                    if (host) continue
+                    if (!versionAt(rx, packet.length)) throw IOException("version") // the host is another release
+                    return "${packet.address.hostAddress}:${packet.port}"
+                }
             }
         }
         return null
+    }
+
+    /** The type of one of the lobby's own packets ("BT3N" then a little-endian 32-bit type), or null for anything
+     * else (a stray packet, the relay's own, another protocol on the port). */
+    private fun typeOf(rx: ByteArray, len: Int): Int? {
+        if (len < 8 || rx[0] != MAGIC_B || rx[1] != MAGIC_T || rx[2] != MAGIC_3 || rx[3] != MAGIC_N) return null
+        return if (rx[5].toInt() == 0 && rx[6].toInt() == 0 && rx[7].toInt() == 0) rx[4].toInt() and 0xFF else null
+    }
+
+    /** Whether a lobby packet carries this build's netcode version (the eighth byte, a little-endian 32-bit number;
+     * net.c NET_VERSION). */
+    private fun versionAt(rx: ByteArray, len: Int): Boolean =
+        len >= 12 && (rx[8].toInt() and 0xFF) == VERSION && rx[9].toInt() == 0 && rx[10].toInt() == 0 && rx[11].toInt() == 0
+
+    /** One of the lobby's own packets: "BT3N", the type, and - for the greeting and its answer - the version; all
+     * little-endian, as the game writes them. */
+    private fun greeting(type: Int, size: Int): ByteArray {
+        val b = ByteArray(size)
+        b[0] = MAGIC_B
+        b[1] = MAGIC_T
+        b[2] = MAGIC_3
+        b[3] = MAGIC_N
+        b[4] = type.toByte()
+        if (size >= 12) b[8] = VERSION.toByte()
+        return b
     }
 
     /** One STUN binding request over the socket: the address the server answers with is what it sees this side under.
@@ -345,8 +379,15 @@ class MatchLobby(service: String) {
         /** The game's netcode version (net.c NET_VERSION): the service refuses a mismatched pair, and so should we. */
         private const val VERSION = 3
 
-        private const val PROBE_PING = "dbt3-launcher-ping"
-        private const val PROBE_PONG = "dbt3-launcher-pong"
+        /* The lobby's greeting, its knock and the greeting's answer (net.c: T_HELLO, T_PUNCH, T_HELLO_ACK), and the
+           "BT3N" magic in front of them - the same bytes a running game sends and answers. */
+        private const val T_HELLO = 1
+        private const val T_HELLO_ACK = 2
+        private const val T_PUNCH = 9
+        private const val MAGIC_B: Byte = 0x42
+        private const val MAGIC_T: Byte = 0x54
+        private const val MAGIC_3: Byte = 0x33
+        private const val MAGIC_N: Byte = 0x4E
 
         /** The room service: the one compiled into the game, or the one named by match_url.txt in the game folder
          * (net_match.c reads the same file on Android). */
