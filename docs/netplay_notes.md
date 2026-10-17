@@ -907,3 +907,29 @@ relay address (it still connects directly).
   plain main menu. PLAY, and the home-screen shortcut, clear the switch again while keeping any other line the
   player put in `bt3_env.txt`.
 - Not tried: a room made on one device and joined from another, both started this way.
+
+## The launcher finds the match itself, before any game starts (2026-10-17)
+
+- The ONLINE control no longer boots the game into its own lobby: it opens a launcher screen (OnlineScreen.kt) where
+  a room is made or joined (data/MatchLobby.kt, AppViewModel.onlineHost/onlineJoin). The game starts only when the
+  other player is found and the two machines have answered each other, and it starts straight into the match:
+  BT3_NET_SESSION=1 plus the role's lines (BT3_NET_HOST/BT3_NET_PUNCH, or BT3_NET_JOIN; BT3_NET_LOCALPORT,
+  BT3_SAVES=net_session, BT3_SOUND_TICKS=1, BT3_NOMOVIE=1) go into bt3_env.txt, net_session/ is removed, and the
+  loader hands the lines on. net.c reads them at boot (Port_NetActive, net.c:883) and opens the session itself;
+  these are the same lines relaunch() writes when the engine restarts into a session (net.c:1124). No game runs
+  before the match begins.
+- The launcher plays the lobby's part, in Kotlin: one UDP socket for the whole wait; STUN (stun.cloudflare.com,
+  then stun.l.google.com) says the address the internet sees that socket under; that address, the LAN address and
+  the netcode version (3) go to the room service (https://dbt3-server.bytarch.com, or match_url.txt if present);
+  the other player's addresses come back from /v1/join or /v1/poll. Instead of trusting that list, the launcher
+  probes the candidates over the socket (small dbt3-launcher-ping/pong datagrams) and uses the address a packet
+  really arrived from - the same thing the engine's lobby learns from the greeting (sCodePunch, net.c:1585). Only
+  then is the socket closed (the engine re-binds the same local port on purpose, so the routers keep taking the
+  session for the conversation they saw) and the game started.
+- Direct connections only: relay=/seen= entries are ignored and no TURN address is asked for, so a pair that cannot
+  open a path (both behind a symmetric NAT, say) is told to use the in-game lobby, which has the relay. Rules are
+  the game's defaults (single battle, 240 seconds: BT3_NET_RULES=768) - the in-game lobby's rules window is where a
+  match is set up differently.
+- PLAY and the home-screen shortcut clear the session lines (GamePaths.setSessionEnv(null)): only a found match
+  writes them. Nothing writes BT3_NET_OPEN any more; the engine's switch stays for anyone who wants it.
+- Not tried yet: two devices with this build, a real pairing.

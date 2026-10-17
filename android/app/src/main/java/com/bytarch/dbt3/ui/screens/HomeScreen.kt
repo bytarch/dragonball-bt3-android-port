@@ -87,6 +87,7 @@ fun HomeScreen(
     onOpenControls: () -> Unit,
     onOpenCheats: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenOnline: () -> Unit,
 ) {
     val install by vm.install.collectAsStateWithLifecycle()
     val packs by vm.texturePacks.collectAsStateWithLifecycle()
@@ -181,7 +182,7 @@ fun HomeScreen(
                 PlayButton(
                     installed,
                     stringResource(R.string.play_online_sub),
-                    vm::playOnline,
+                    onOpenOnline,
                     label = R.string.play_online,
                     icon = Icons.Rounded.Public,
                     width = 158.dp,

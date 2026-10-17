@@ -31,6 +31,7 @@ import com.bytarch.dbt3.data.GamePaths
 import com.bytarch.dbt3.data.GpuDriver
 import com.bytarch.dbt3.data.GpuDrivers
 import com.bytarch.dbt3.data.LogExport
+import com.bytarch.dbt3.data.MatchLobby
 import com.bytarch.dbt3.data.ImportResult
 import com.bytarch.dbt3.data.InstallState
 import com.bytarch.dbt3.data.Mods
@@ -57,6 +58,18 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /** A long operation in progress (shown as a bar with its text). */
 data class Busy(val title: String, val detail: String = "")
+
+/** One step of the launcher's room flow: idle, busy with the service, hosting (its code shown), opening a path to
+ * the player found, or failed with something to say. */
+enum class OnlinePhase { IDLE, WORKING, HOSTING, CONNECTING, FAILED }
+
+/** The online screen's state (AppViewModel.online). */
+data class OnlineState(
+    val phase: OnlinePhase = OnlinePhase.IDLE,
+    val code: String = "",
+    val peer: String = "",
+    val error: String = "",
+)
 
 /** What a boot check has got to: not reached yet, being done now, or done. */
 enum class StepState { Waiting, Working, Ok, Warn, Fail }
@@ -623,24 +636,146 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- launch
 
-    fun play() = launchGame(online = false)
+    fun play() = launchGame()
 
-    /** Starts the game with the engine's own online screen opening by itself at the main menu (the loader's
-     * BT3_NET_OPEN switch; port/src/headless.c). */
-    fun playOnline() = launchGame(online = true)
-
-    private fun launchGame(online: Boolean) {
+    private fun launchGame() {
         when {
             _install.value !is InstallState.Installed -> say(str(R.string.msg_install_first))
             !engineAvailable -> say(str(R.string.msg_no_engine))
             else -> {
-                paths.setOnlineEnv(online)
-                getApplication<android.app.Application>().startActivity(
-                    android.content.Intent(getApplication(), com.bytarch.dbt3.engine.GameActivity::class.java)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+                paths.setOnlineEnv(false)
+                // the session lines belong to a match that is beginning (startMatch below): a room found earlier
+                // must not pull a plain Play into one
+                paths.setSessionEnv(null)
+                startGame()
             }
         }
+    }
+
+    // ---- online (the launcher's own matchmaking, before any game has started)
+
+    private val _online = MutableStateFlow(OnlineState())
+    val online: StateFlow<OnlineState> = _online.asStateFlow()
+    private var onlineJob: Job? = null
+    private var onlineRoom: Pair<String, String>? = null // a room this side made; given up when the wait ends
+
+    /** The launcher's way into a match: find the other player here, then start the game straight into it. The
+     * engine's own lobby (with its relay, for lines that cannot go direct) stays as it is. */
+    fun onlineHost() = findOpponent(host = true, code = "")
+
+    fun onlineJoin(code: String) = findOpponent(host = false, code = code.trim().uppercase())
+
+    fun onlineCancel() {
+        onlineJob?.cancel()
+        onlineJob = null
+        _online.value = OnlineState()
+    }
+
+    private fun findOpponent(host: Boolean, code: String) {
+        when {
+            _install.value !is InstallState.Installed -> say(str(R.string.msg_install_first))
+            !engineAvailable -> say(str(R.string.msg_no_engine))
+            !host && code.isEmpty() -> Unit
+            onlineJob?.isActive == true -> Unit
+            else -> {
+                _online.value = OnlineState(OnlinePhase.WORKING)
+                onlineJob = viewModelScope.launch {
+                    val lobby = MatchLobby(MatchLobby.service(paths.root))
+                    try {
+                        val name = _playerName.value.ifEmpty { "Player" }
+                        val addrs = withContext(Dispatchers.IO) { listOf(lobby.publicAddr(), lobby.lanAddr()) }
+                            .filter { it.isNotEmpty() }
+                        if (addrs.isEmpty()) throw IOException(str(R.string.online_no_internet))
+                        if (host) {
+                            val (room, key) = withContext(Dispatchers.IO) { lobby.host(name, addrs) }
+                            onlineRoom = room to key
+                            _online.value = OnlineState(OnlinePhase.HOSTING, code = room)
+                            var peer: MatchLobby.Peer? = null
+                            while (peer == null) {
+                                delay(2000)
+                                peer = withContext(Dispatchers.IO) { lobby.poll(room, key) }
+                            }
+                            // the room has done its work as soon as both sides know each other (the engine's own
+                            // lobby gives it up at the same moment)
+                            withContext(Dispatchers.IO) { lobby.leave(room, key) }
+                            onlineRoom = null
+                            beginMatch(lobby, peer, host = true)
+                        } else {
+                            val peer = withContext(Dispatchers.IO) { lobby.join(code, name, addrs) }
+                            beginMatch(lobby, peer, host = false)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        _online.value = OnlineState(OnlinePhase.FAILED, error = onlineError(e))
+                    } finally {
+                        val room = onlineRoom
+                        onlineRoom = null
+                        // the room has done its work (or the wait was given up): give it back, even on a cancel
+                        if (room != null) runCatching { withContext(NonCancellable) { lobby.leave(room.first, room.second) } }
+                        runCatching { lobby.socket.close() }
+                    }
+                }
+            }
+        }
+    }
+
+    /** The other player is known: find which of their addresses really answers, then hand the match to the engine. */
+    private suspend fun beginMatch(lobby: MatchLobby, peer: MatchLobby.Peer, host: Boolean) {
+        _online.value = OnlineState(OnlinePhase.CONNECTING, peer = peer.name)
+        val wire = withContext(Dispatchers.IO) { lobby.probe(peer.addrs, 20_000) }
+            ?: throw IOException(str(R.string.online_unreachable))
+        val port = lobby.localPort
+        lobby.socket.close() // the engine binds this same port in a moment: see the class comment on MatchLobby
+        startMatch(port, wire, host)
+        _online.value = OnlineState()
+    }
+
+    /** What net.c reads at boot for a session (the same lines it writes itself before restarting into one): this
+     * side's role, the address found, and the save folder that starts empty. */
+    private fun startMatch(port: Int, peer: String, host: Boolean) {
+        val vars = mutableMapOf(
+            "BT3_NET_SESSION" to "1",
+            "BT3_NET_LOCALPORT" to "$port",
+            "BT3_SAVES" to "net_session",
+            "BT3_SOUND_TICKS" to "1",
+            "BT3_NOMOVIE" to "1",
+        )
+        if (host) {
+            vars["BT3_NET_HOST"] = "$port"
+            vars["BT3_NET_PUNCH"] = peer
+            vars["BT3_NET_RULES"] = "768" // single battle, 240 seconds: the game's defaults (net.c sRules)
+        } else {
+            vars["BT3_NET_JOIN"] = peer
+        }
+        paths.setOnlineEnv(false)
+        paths.clearNetSession()
+        paths.setSessionEnv(vars)
+        startGame()
+    }
+
+    private fun startGame() {
+        getApplication<Application>().startActivity(
+            Intent(getApplication(), com.bytarch.dbt3.engine.GameActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    /** The service refuses with {"error": "..."} (worker.js): say it in the player's language. Anything else is this
+     * side's own message (no internet, unreachable) and is shown as it stands. */
+    private fun onlineError(e: Exception): String {
+        val text = e.message.orEmpty()
+        val json = runCatching { org.json.JSONObject(text) }.getOrNull()
+        if (json != null) {
+            return when (json.optString("error")) {
+                "version" -> str(R.string.online_version)
+                "no room" -> str(R.string.online_no_room)
+                "full" -> str(R.string.online_full)
+                "busy" -> str(R.string.online_busy)
+                else -> str(R.string.online_failed)
+            }
+        }
+        return text.ifBlank { str(R.string.online_failed) }
     }
 
     /** A "Play" icon for the home screen: it starts the game without opening the launcher (PlayShortcutActivity). */

@@ -32,6 +32,24 @@ object Net {
         }
     }
 
+    /** POSTs [body] (JSON) and answers with the response's text. A refusal carries the service's own answer as the
+     * exception message: the matchmaking service (port/matchmaking) says what went wrong in it. */
+    suspend fun postJson(url: String, body: String): String = withContext(Dispatchers.IO) {
+        val c = open(url)
+        try {
+            c.requestMethod = "POST"
+            c.doOutput = true
+            c.setRequestProperty("Content-Type", "application/json")
+            c.outputStream.use { it.write(body.toByteArray()) }
+            val text = (if (c.responseCode in 200..299) c.inputStream else c.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (c.responseCode !in 200..299) throw IOException(text.ifBlank { "HTTP ${c.responseCode}" })
+            text
+        } finally {
+            c.disconnect()
+        }
+    }
+
     /** Downloads [url] to [dest]; [onProgress] gets (bytes so far, total or -1) a few times a second. */
     suspend fun download(url: String, dest: File, onProgress: (Long, Long) -> Unit) = withContext(Dispatchers.IO) {
         val c = open(url)

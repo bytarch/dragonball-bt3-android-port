@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Texture
@@ -62,6 +63,7 @@ import com.bytarch.dbt3.ui.screens.BootScreen
 import com.bytarch.dbt3.ui.screens.CheatsScreen
 import com.bytarch.dbt3.ui.screens.ControlsScreen
 import com.bytarch.dbt3.ui.screens.HomeScreen
+import com.bytarch.dbt3.ui.screens.OnlineScreen
 import com.bytarch.dbt3.ui.screens.SettingsScreen
 import com.bytarch.dbt3.ui.screens.UpdateDialog
 import com.bytarch.dbt3.ui.theme.Dbt3Theme
@@ -89,6 +91,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class Dest(val route: String, val label: Int, val icon: ImageVector) {
     HOME("home", R.string.nav_home, Icons.Rounded.Home),
+    ONLINE("online", R.string.play_online, Icons.Rounded.Public),
     BATTLEPASS("battlepass", R.string.nav_battlepass, Icons.Rounded.Extension),
     CONTROLS("controls", R.string.nav_controls, Icons.Rounded.SportsEsports),
     CHEATS("cheats", R.string.nav_cheats, Icons.Rounded.LockOpen),
@@ -140,8 +143,10 @@ private fun Dbt3App(vm: AppViewModel) {
                         onOpenControls = { go(Dest.CONTROLS) },
                         onOpenCheats = { go(Dest.CHEATS) },
                         onOpenSettings = { go(Dest.SETTINGS) },
+                        onOpenOnline = { go(Dest.ONLINE) },
                     )
                 }
+                composable(Dest.ONLINE.route) { OnlineScreen(vm) { go(Dest.HOME) } }
                 // there is no dock: every screen but the lobby carries its own way back to it
                 composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) { go(Dest.HOME) } }
                 composable(Dest.CONTROLS.route) { ControlsScreen(vm) { go(Dest.HOME) } }

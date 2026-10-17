@@ -17,7 +17,10 @@ class PlayShortcutActivity : Activity() {
         super.onCreate(savedInstanceState)
         val paths = GamePaths(this)
         val ready = paths.installedMarker.exists() && EngineBridge.isAvailable(this)
-        if (ready) paths.setOnlineEnv(false) // the shortcut plays the game as it is, never the online screen
+        if (ready) {
+            paths.setOnlineEnv(false) // the shortcut plays the game as it is, never the online screen
+            paths.setSessionEnv(null) // nor into a match a room found earlier
+        }
         val target = if (ready) GameActivity::class.java else MainActivity::class.java
         startActivity(Intent(this, target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()

@@ -48,4 +48,29 @@ class GamePaths(context: Context) {
             if (lines.isEmpty()) engineEnv.delete() else engineEnv.writeText(lines.joinToString("\n") + "\n")
         }
     }
+
+    /** The lines an engine session is started with (port/src/gs/net.c relaunch writes the same ones when it restarts
+     * itself for a match). They are replaced as a family: a stale line from last time (a port, a join address)
+     * cannot be left behind by accident, and a null map erases them all before a plain Play. */
+    fun setSessionEnv(vars: Map<String, String>?) {
+        runCatching {
+            val kept = if (engineEnv.exists()) {
+                engineEnv.readLines().filterNot { line -> sessionKeys.any { line.startsWith("$it=") } }
+            } else {
+                emptyList()
+            }
+            val lines = kept + (vars ?: emptyMap()).map { (name, value) -> "$name=$value" }
+            if (lines.isEmpty()) engineEnv.delete() else engineEnv.writeText(lines.joinToString("\n") + "\n")
+        }
+    }
+
+    /** The session's save folder starts empty, the way the engine's own session start has it. */
+    fun clearNetSession() {
+        runCatching { File(root, "net_session").deleteRecursively() }
+    }
+
+    private val sessionKeys = listOf(
+        "BT3_NET_SESSION", "BT3_NET_HOST", "BT3_NET_JOIN", "BT3_NET_LOCALPORT", "BT3_NET_PUNCH",
+        "BT3_NET_RULES", "BT3_SAVES", "BT3_SOUND_TICKS", "BT3_NOMOVIE",
+    )
 }
