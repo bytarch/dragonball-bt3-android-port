@@ -1268,6 +1268,9 @@ SDL_Window *GsDraw_WindowCreate(int opengl) {
     sFullscreen = (getenv("BT3_FULLSCREEN") != NULL ? atoi(getenv("BT3_FULLSCREEN")) : Port_Setting("fullscreen", 0)) != 0;
 #ifdef __ANDROID__
     sFullscreen = 1; /* (the whole screen, without the system's bars) */
+    /* Landscape both ways, and say so: with a resizable window and no orientation hint SDL asks Android for
+       FULL_USER, which follows the phone's rotation lock (the game showed up in portrait on a locked phone). */
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 #endif
     sWantAspect = want;
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "DBT3");
