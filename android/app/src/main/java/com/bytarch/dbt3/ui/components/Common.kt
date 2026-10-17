@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,12 +54,26 @@ fun Modifier.kiBackground(primary: Color, secondary: Color): Modifier = drawBehi
     )
 }
 
+/** A screen's heading, the way a game writes one: a short accent kicker over a heavy title, not an app bar. */
 @Composable
 fun ScreenTitle(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
-    Column(modifier.padding(horizontal = 4.dp, vertical = 12.dp)) {
-        Text(title.uppercase(), style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
+    Column(modifier.padding(horizontal = 4.dp, vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(width = 4.dp, height = 26.dp).clip(MaterialTheme.shapes.extraSmall).background(MaterialTheme.colorScheme.primary))
+            Spacer(Modifier.width(10.dp))
+            Text(
+                title.uppercase(),
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
         if (subtitle != null) {
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 14.dp, top = 2.dp),
+            )
         }
     }
 }
@@ -78,18 +91,21 @@ fun SectionCard(
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (icon != null) {
-                    Box(
-                        Modifier.size(32.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f)),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp)) }
-                    Spacer(Modifier.width(10.dp))
+        Row {
+            // a lit edge down the side of the panel, the way a game's menu marks what is selected
+            Box(
+                Modifier.width(4.dp).background(accent.copy(alpha = 0.85f)),
+            )
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (icon != null) {
+                        Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Text(title, style = MaterialTheme.typography.titleMedium)
                 }
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                content()
             }
-            content()
         }
     }
 }

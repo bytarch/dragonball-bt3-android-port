@@ -54,13 +54,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.bytarch.dbt3.ui.components.BusyBar
 import com.bytarch.dbt3.ui.components.kiBackground
+import com.bytarch.dbt3.ui.screens.BattlePassScreen
 import com.bytarch.dbt3.ui.screens.BootScreen
 import com.bytarch.dbt3.ui.screens.CheatsScreen
 import com.bytarch.dbt3.ui.screens.ControlsScreen
 import com.bytarch.dbt3.ui.screens.HomeScreen
-import com.bytarch.dbt3.ui.screens.ModsScreen
 import com.bytarch.dbt3.ui.screens.SettingsScreen
-import com.bytarch.dbt3.ui.screens.TexturesScreen
 import com.bytarch.dbt3.ui.screens.UpdateDialog
 import com.bytarch.dbt3.ui.theme.Dbt3Theme
 
@@ -81,8 +80,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class Dest(val route: String, val label: Int, val icon: ImageVector) {
     HOME("home", R.string.nav_home, Icons.Rounded.Home),
-    TEXTURES("textures", R.string.nav_textures, Icons.Rounded.Texture),
-    MODS("mods", R.string.nav_mods, Icons.Rounded.Extension),
+    BATTLEPASS("battlepass", R.string.nav_battlepass, Icons.Rounded.Extension),
     CONTROLS("controls", R.string.nav_controls, Icons.Rounded.SportsEsports),
     CHEATS("cheats", R.string.nav_cheats, Icons.Rounded.LockOpen),
     SETTINGS("settings", R.string.nav_settings, Icons.Rounded.Settings),
@@ -151,8 +149,7 @@ private fun Dbt3App(vm: AppViewModel) {
                     modifier = Modifier.widthIn(max = 760.dp).fillMaxSize(),
                 ) {
                     composable(Dest.HOME.route) { HomeScreen(vm) }
-                    composable(Dest.TEXTURES.route) { TexturesScreen(vm) }
-                    composable(Dest.MODS.route) { ModsScreen(vm) }
+                    composable(Dest.BATTLEPASS.route) { BattlePassScreen(vm) }
                     composable(Dest.CONTROLS.route) { ControlsScreen(vm) }
                     composable(Dest.CHEATS.route) { CheatsScreen(vm) }
                     composable(Dest.SETTINGS.route) { SettingsScreen(vm) }

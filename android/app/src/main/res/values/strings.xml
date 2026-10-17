@@ -43,6 +43,11 @@
     <string name="boot_new_build">Build %1$s is ready</string>
     <string name="boot_build">Build %1$s (%2$d)</string>
     <string name="boot_please_wait">Please wait…</string>
+
+    <string name="nav_battlepass">Battle pass</string>
+    <string name="battlepass_title">Battle pass</string>
+    <string name="battlepass_sub">Texture packs, mods, stages and songs: everything that changes how the game looks and plays</string>
+    <string name="tab_packs">Packs %1$d</string>
     <string name="err_iso_download">The game ISO could not be downloaded: %1$s</string>
     <string name="game_data_ok">USA release verified · %1$d files · %2$s</string>
     <string name="game_data_ok_mod">Modified image · %1$d files · %2$s</string>
