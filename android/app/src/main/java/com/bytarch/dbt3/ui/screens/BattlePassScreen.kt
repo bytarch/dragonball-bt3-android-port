@@ -67,6 +67,7 @@ import com.bytarch.dbt3.data.TexturePack
 import com.bytarch.dbt3.data.formatBytes
 import com.bytarch.dbt3.ui.components.BattlePassPreview
 import com.bytarch.dbt3.ui.components.EmptyState
+import com.bytarch.dbt3.ui.components.HudChip
 import com.bytarch.dbt3.ui.components.HudHeader
 import com.bytarch.dbt3.ui.components.SectionCard
 import com.bytarch.dbt3.ui.theme.Dbz
