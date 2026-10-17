@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -306,7 +307,7 @@ fun HudPanel(
 /** Our own art behind a screen, dimmed so text on top of it still reads. */
 @Composable
 fun Modifier.stageBackdrop(@DrawableRes res: Int, dim: Float = 0.82f): Modifier =
-    background(painterResource(res), contentScale = ContentScale.Crop)
+    paint(painterResource(res), contentScale = ContentScale.Crop)
         .background(Color.Black.copy(alpha = dim))
 
 
