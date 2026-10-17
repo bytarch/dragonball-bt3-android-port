@@ -305,7 +305,6 @@
     <string name="err_no_textures_seen">Imagens no zip: %1$s.</string>
 <string name="nav_record">Record</string>
     <string name="online_quick">Partida rápida</string>
-    <string name="online_quick_sub">Encontrar um adversário</string>
     <string name="online_population">%1$d online · %2$d esperando</string>
     <string name="online_population_full">%1$d jogador(es) online · %2$d esperando adversário · %3$d numa partida</string>
     <string name="record_title">Histórico de batalhas</string>
@@ -325,4 +324,8 @@
     <string name="record_reason_other">Motivo %1$d</string>
     <string name="record_empty">Nenhuma partida ainda</string>
     <string name="record_empty_text">Termine uma partida online e ela fica escrita aqui.</string>
+    <string name="record_service">Recorde no serviço: %1$d vitórias · %2$d derrotas</string>
+    <string name="record_public_id">ID público: %1$s</string>
+    <string name="online_peer_record">%1$d vitórias · %2$d derrotas</string>
+    <string name="online_peer_id">ID público: %1$s</string>
 </resources>

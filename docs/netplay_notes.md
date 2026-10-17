@@ -949,11 +949,9 @@ relay address (it still connects directly).
   (the lobby has the same window).
 - PLAY and the home-screen shortcut clear the session lines (GamePaths.setSessionEnv(null)): only a found match
   writes them. Nothing writes BT3_NET_OPEN any more; the engine's switch stays for anyone who wants it.
-- Quick match is a button of its own on the home screen, where the ONLINE button was: one tap and the queue runs from
-  there, with a line under the profile row saying what it is doing and a Cancel on it (`HomeScreen.OnlineBusy`; the
-  state is the same `AppViewModel.online` the online screen shows, so nothing new was needed underneath). Making a
-  room is a rail button beside it: the wait begins at once and the online screen opens on it, which is where the code
-  is shown. The online screen itself (join with a code, and all three again) is the rail's ONLINE button now.
+- Play and quick match are the two plain buttons in the middle of the bottom row, each one line of words and
+  nothing else: PLAY starts the game, Quick match starts the queue. The online screen (the rail's ONLINE button) is
+  where a room is made or joined by code, and shows the queue and player counts at its top.
 - **What is happening now, so a player can see whether anybody is about** (`POST /v1/stats`, port/matchmaking/server.py):
   `{queued, playing, online}` from the tables the service already keeps - the quick-match queue's alive places (the
   same test it pairs on), the rooms with both players that are younger than a match can be, and the players those
@@ -963,6 +961,22 @@ relay address (it still connects directly).
   the home screen (next to the record) and the whole line on the online screen, and simply keeps the numbers at zero
   against a service that has not been restarted since this POST existed. `check_stats` in the service's own selftest
   (`python3 server.py --selftest`) is what proves the counts.
+- **Records are public, stored by the service, and looked up by a public id.** The service already had the counting
+  machinery (`players` / `results`, settled when both sides agree); what the launcher path never did was reach it, so
+  nothing was stored: the engine's report needs the room the match came from, only its own lobby remembers one, and
+  the launcher (which had the room) told the game nothing and gave the room up. Now the launcher hands it over
+  (`BT3_NET_ROOM` / `BT3_NET_KEY` in `bt3_env.txt`; the engine's `Port_NetActive` gives them to `Match_Room`,
+  net_match.c) and the match's `/v1/result` lands like any other. The room may still be given up before the fight:
+  `done` only refuses a joiner, and a report is checked against the keys, not the room's life.
+- Every player says its recovery code on every matchmaking POST (`host` / `join` / `queue`), which the service
+  already stored beside the room or queue entry - so it can say who the other player is. Records are public by
+  design: `shared_record` no longer reads the `share` flag (the column is kept so old databases still open), and
+  every peer answer carries `record` and `id` beside the name. The public id is 16 hex characters cut out of a hash
+  of the stored hash (`public_id`): the same on every machine the player types their code into, enough to look a
+  record up, useless for claiming one (only the code hashes to the stored key). `/v1/record {id}` looks anybody up by
+  code or public id, writing nothing. The launcher shows the opponent's record and public id while a match is being
+  opened, and its own service record and public id on the record screen (refreshed on every resume, like the local
+  file next to it). `check_public` in the service's selftest is what proves all of this.
 - A session that ended used to end the whole process, the desktop way: `relaunch()` execs `/proc/self/exe`, which on
   Android is the app's runtime and not this game, so the game died with signal 11 at address 0 the moment a session
   finished (or was lost) - a launcher match looked as if it "just exited", and the other side saw the packets stop.

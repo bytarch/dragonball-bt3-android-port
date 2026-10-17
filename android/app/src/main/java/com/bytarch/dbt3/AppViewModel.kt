@@ -69,6 +69,9 @@ data class OnlineState(
     val phase: OnlinePhase = OnlinePhase.IDLE,
     val code: String = "",
     val peer: String = "",
+    /** The other player's public id and record, when the service has said who they are (records are public). */
+    val peerId: String = "",
+    val peerRecord: Pair<Int, Int>? = null,
     val error: String = "",
     val waiting: Int = 0,
     val queued: Int = 0,
@@ -132,6 +135,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // the online battles this device has finished, as the engine wrote them down
     private val _record = MutableStateFlow<List<BattleRecord>>(emptyList())
     val record: StateFlow<List<BattleRecord>> = _record.asStateFlow()
+
+    // this player's record at the service: the copy that follows the recovery code, and its public id
+    private val _myRecord = MutableStateFlow(MatchLobby.MyRecord())
+    val myRecord: StateFlow<MatchLobby.MyRecord> = _myRecord.asStateFlow()
 
     // what the service says is happening now: the queue, the matches, the players
     private val _stats = MutableStateFlow(MatchLobby.Stats())
@@ -347,6 +354,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _touch.value = touchStore.load() // (the game's own quick menu may have changed it)
             _record.value = BattleRecord.read(paths.root) // (the game appends a line when a battle is decided)
             refreshStats()
+            val id = _recovery.value
+            if (id.matches(Regex("[0-9a-f]{32}"))) {
+                runCatching { MatchLobby(MatchLobby.service(paths.root)).player(id, _playerName.value) }
+                    .onSuccess { _myRecord.value = it }
+            }
         }
     }
 
@@ -713,12 +725,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val lobby = MatchLobby(MatchLobby.service(paths.root))
                     try {
                         val name = _playerName.value.ifEmpty { "Player" }
+                        val id = _recovery.value   // the recovery code: the service stores its hash, beside the room
                         val addrs = withContext(Dispatchers.IO) { listOf(lobby.publicAddr(), lobby.lanAddr()) }
                             .filter { it.isNotEmpty() }
                         if (addrs.isEmpty()) throw IOException(str(R.string.online_no_internet))
                         if (quick) {
                             // the queue gives the room to whoever waited, so this side hosts only when it was first
-                            var wait = withContext(Dispatchers.IO) { lobby.queueTake(name, addrs) }
+                            var wait = withContext(Dispatchers.IO) { lobby.queueTake(name, addrs, id) }
                             val relay = withContext(Dispatchers.IO) { lobby.takeRelay(wait.turn) } // published on the next poll
                             var pair = wait.pair
                             var waited = 0L
@@ -727,7 +740,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 delay(2000)
                                 waited += 2000
                                 wait = withContext(Dispatchers.IO) {
-                                    lobby.queuePoll(wait.key, listOfNotNull(relay))
+                                    lobby.queuePoll(wait.key, listOfNotNull(relay), id)
                                 }
                                 pair = wait.pair
                             }
@@ -735,7 +748,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             withContext(Dispatchers.IO) { lobby.queueGiveUp() } // the place is gone: a room is left
                             beginMatch(lobby, found.peer, host = found.matched == 1, room = found.code to found.key)
                         } else if (host) {
-                            val made = withContext(Dispatchers.IO) { lobby.host(name, addrs) }
+                            val made = withContext(Dispatchers.IO) { lobby.host(name, addrs, id) }
                             val room = made.code
                             val key = made.key
                             onlineRoom = room to key
@@ -754,10 +767,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             // lobby gives it up at the same moment)
                             withContext(Dispatchers.IO) { lobby.leave(room, key) }
                             onlineRoom = null
-                            beginMatch(lobby, peer, host = true)
+                            beginMatch(lobby, peer, host = true, room = room to key)
                         } else {
-                            val peer = withContext(Dispatchers.IO) { lobby.join(code, name, addrs) }
-                            beginMatch(lobby, peer, host = false)
+                            val joined = withContext(Dispatchers.IO) { lobby.join(code, name, addrs, id) }
+                            beginMatch(lobby, joined.peer, host = false, room = code to joined.key)
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -782,20 +795,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * When nothing direct answers, the other side's relayed address is used instead (only the hosting side holds
      * one, so the path then exists even through a NAT that hides both machines). */
     private suspend fun beginMatch(lobby: MatchLobby, peer: MatchLobby.Peer, host: Boolean, room: Pair<String, String>? = null) {
-        _online.value = OnlineState(OnlinePhase.CONNECTING, peer = peer.name)
+        _online.value = OnlineState(
+            OnlinePhase.CONNECTING,
+            peer = peer.name,
+            peerId = peer.id,
+            peerRecord = peer.record,
+        )
         val wire = withContext(Dispatchers.IO) { lobby.probe(peer.addrs, 20_000, host = host) }
             ?: peer.relay.ifEmpty { throw IOException(str(R.string.online_unreachable)) }
         if (room != null) withContext(Dispatchers.IO) { lobby.leave(room.first, room.second) }
         val port = lobby.localPort
         lobby.socket.close() // the engine binds this same port in a moment: see the class comment on MatchLobby
-        startMatch(port, wire, host, lobby.relayLogin)
+        startMatch(port, wire, host, lobby.relayLogin, room)
         _online.value = OnlineState()
     }
 
     /** What net.c reads at boot for a session (the same lines it writes itself before restarting into one): this
      * side's role, the address found, the save folder that starts empty, and the relay login when this side holds a
      * relayed address (the engine takes the same allocation over, on the same port). */
-    private fun startMatch(port: Int, peer: String, host: Boolean, turn: MatchLobby.Turn?) {
+    private fun startMatch(port: Int, peer: String, host: Boolean, turn: MatchLobby.Turn?, room: Pair<String, String>? = null) {
         val vars = mutableMapOf(
             "BT3_NET_SESSION" to "1",
             "BT3_NET_LOCALPORT" to "$port",
@@ -814,6 +832,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             vars["BT3_TURN_SERVER"] = turn.server
             vars["BT3_TURN_USER"] = turn.username
             vars["BT3_TURN_CRED"] = turn.credential
+        }
+        // the room this match came from, so the game can say how it went (net_match.c Match_Room)
+        if (room != null) {
+            vars["BT3_NET_ROOM"] = room.first
+            vars["BT3_NET_KEY"] = room.second
         }
         paths.setOnlineEnv(false)
         paths.clearNetSession()

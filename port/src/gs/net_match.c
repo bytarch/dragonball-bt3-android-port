@@ -112,6 +112,19 @@ static void remember_room(const char *key) {
     SDL_UnlockMutex(sM.lock);
 }
 
+/* The room a match came from, when this copy did not find it: the Android launcher does the matchmaking itself and
+   hands the room over in the environment (BT3_NET_ROOM, BT3_NET_KEY), because the result is said against that room.
+   Both words or neither: one without the other is no use to the service. */
+void Match_Room(const char *code, const char *key) {
+    if (code == NULL || key == NULL || code[0] == '\0' || key[0] == '\0') {
+        return;
+    }
+    SDL_LockMutex(sM.lock);
+    SDL_strlcpy(sRoomCode, code, sizeof(sRoomCode));
+    SDL_strlcpy(sRoomKey, key, sizeof(sRoomKey));
+    SDL_UnlockMutex(sM.lock);
+}
+
 /* One POST of how the match went, on its own thread: the game is back in the menu by the time this is called and
    must not wait for the service, and the match is over anyway. */
 static int SDLCALL report_thread(void *arg) {

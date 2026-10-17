@@ -385,7 +385,6 @@
     <string name="hud_tab_controls">Controls</string>
 <string name="nav_record">Record</string>
     <string name="online_quick">Quick match</string>
-    <string name="online_quick_sub">Find an opponent</string>
     <string name="online_population">%1$d online · %2$d waiting</string>
     <string name="online_population_full">%1$d player(s) online · %2$d waiting for an opponent · %3$d in a match</string>
     <string name="record_title">Battle record</string>
@@ -405,4 +404,8 @@
     <string name="record_reason_other">Reason %1$d</string>
     <string name="record_empty">No battles yet</string>
     <string name="record_empty_text">Finish an online battle and it is written down here.</string>
+    <string name="record_service">Service record: %1$d won · %2$d lost</string>
+    <string name="record_public_id">Public ID: %1$s</string>
+    <string name="online_peer_record">%1$d won · %2$d lost</string>
+    <string name="online_peer_id">Public ID: %1$s</string>
 </resources>

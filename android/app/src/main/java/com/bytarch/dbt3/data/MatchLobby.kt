@@ -54,8 +54,9 @@ class MatchLobby(service: String) {
     data class Hosted(val code: String, val key: String, val turn: Turn?)
 
     /** Makes a room; the code it answers with is what the other player types. */
-    suspend fun host(name: String, addrs: List<String>): Hosted {
-        val answer = post("host", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs)))
+    suspend fun host(name: String, addrs: List<String>, id: String): Hosted {
+        val answer = post("host", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs))
+            .put("id", id))
         return Hosted(answer.getString("code"), answer.getString("key"), turnOf(answer))
     }
 
@@ -65,11 +66,15 @@ class MatchLobby(service: String) {
         return peerOf(answer.optJSONObject("peer"))
     }
 
-    /** Joins a room: the answer carries the host's addresses at once. */
-    suspend fun join(code: String, name: String, addrs: List<String>): Peer {
-        val answer = post("join", JSONObject().put("v", VERSION).put("code", code).put("name", name).put("addrs", JSONArray(addrs)))
-        return peerOf(answer.optJSONObject("peer")) ?: throw IOException("no peer")
+    /** Joins a room: the answer carries the host's addresses, their record and their public id at once. [Joined.key]
+     *  is this side's own key for the room, which the game is told so it can say how the match went. */
+    suspend fun join(code: String, name: String, addrs: List<String>, id: String): Joined {
+        val answer = post("join", JSONObject().put("v", VERSION).put("code", code).put("name", name)
+            .put("addrs", JSONArray(addrs)).put("id", id))
+        return Joined(answer.getString("key"), peerOf(answer.optJSONObject("peer")) ?: throw IOException("no peer"))
     }
+
+    data class Joined(val key: String, val peer: Peer)
 
     /** What one answer of the quick-match queue says. */
     data class QueueAnswer(val key: String, val ahead: Int, val total: Int, val pair: QueuePair?, val turn: Turn?)
@@ -94,14 +99,16 @@ class MatchLobby(service: String) {
         private set
 
     /** Takes a place in the quick-match queue, or is paired at once when somebody is already waiting. */
-    suspend fun queueTake(name: String, addrs: List<String>): QueueAnswer =
-        queueAnswer(post("queue", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs))))
+    suspend fun queueTake(name: String, addrs: List<String>, id: String): QueueAnswer =
+        queueAnswer(post("queue", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs))
+            .put("id", id)))
 
     /** Asks whether a place in the queue has become a pair yet; [moreAddrs] are published on the way (the relayed
      * address, once there is one: whoever is paired with this side must be told about it). */
-    suspend fun queuePoll(key: String, moreAddrs: List<String> = emptyList()): QueueAnswer {
+    suspend fun queuePoll(key: String, moreAddrs: List<String> = emptyList(), id: String = ""): QueueAnswer {
         val body = JSONObject().put("key", key)
         if (moreAddrs.isNotEmpty()) body.put("addrs", JSONArray(moreAddrs))
+        body.put("id", id)
         queueKey = key
         return queueAnswer(post("queue", body))
     }
@@ -112,6 +119,16 @@ class MatchLobby(service: String) {
         val key = queueKey ?: return
         queueKey = null
         runCatching { post("qcancel", JSONObject().put("key", key)) }
+    }
+
+    /** This player's own record at the service, and the public id that record is looked up by (POST /v1/player).
+     *  The service stores only the hash of the recovery code, and gives the public id back for it. */
+    data class MyRecord(val name: String = "", val wins: Int = 0, val losses: Int = 0, val id: String = "")
+
+    suspend fun player(id: String, name: String): MyRecord {
+        val answer = post("player", JSONObject().put("id", id).put("name", name).put("platform", "mobile"))
+        return MyRecord(answer.optString("name", name), answer.optInt("wins"), answer.optInt("losses"),
+            answer.optString("id"))
     }
 
     /** What the service can say about right now (POST /v1/stats, port/matchmaking/server.py): [queued] places in the
@@ -379,12 +396,21 @@ class MatchLobby(service: String) {
         // relayed address, kept aside: an ordinary address to try when nothing direct answers
         val relay = all.firstOrNull { it.startsWith("relay=") }?.removePrefix("relay=").orEmpty()
         val addrs = all.filter { it.isNotEmpty() && !it.contains("=") }
-        return Peer(peer.optString("name", "Player"), addrs, relay)
+        val record = peer.optJSONObject("record")?.let { it.optInt("wins") to it.optInt("losses") }
+        return Peer(peer.optString("name", "Player"), addrs, relay, peer.optString("id", ""), record)
     }
 
     /** The other player: the name to show while connecting, and the addresses to try. [relay] is the other side's
      * relayed address, when it has one. */
-    data class Peer(val name: String, val addrs: List<String>, val relay: String = "")
+    data class Peer(
+        val name: String,
+        val addrs: List<String>,
+        val relay: String = "",
+        /** Their public id (16 hex characters, the same on every machine they type their recovery code into). */
+        val id: String = "",
+        /** Their record, public by design: null when the service has never heard of them. */
+        val record: Pair<Int, Int>? = null,
+    )
 
     companion object {
         /** The game's netcode version (net.c NET_VERSION): the service refuses a mismatched pair, and so should we. */

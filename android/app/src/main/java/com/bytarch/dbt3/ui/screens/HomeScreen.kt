@@ -200,14 +200,13 @@ fun HomeScreen(
                 Spacer(Modifier.width(4.dp))
                 HudTab(stringResource(R.string.hud_tab_cheats), false, onOpenCheats)
                 Spacer(Modifier.weight(1f))
-                PlayButton(installed, dataLabel, vm::play)
+                PlayButton(installed, vm::play)
                 Spacer(Modifier.width(8.dp))
                 PlayButton(
                     installed,
-                    stringResource(R.string.online_quick_sub),
                     { vm.onlineFind() },
                     label = R.string.online_quick,
-                    icon = Icons.Rounded.Bolt,
+                    icon = null,
                     width = 158.dp,
                     brush = Brush.horizontalGradient(listOf(Dbz.KiBlue, Violet)),
                 )
@@ -608,10 +607,10 @@ private fun CountsCard(mods: Int, packs: Int, stages: Int, songs: Int) {
 @Composable
 private fun PlayButton(
     installed: Boolean,
-    dataLabel: String,
     onClick: () -> Unit,
     label: Int = R.string.play,
-    icon: ImageVector = Icons.Rounded.PlayArrow,
+    sub: String = "",
+    icon: ImageVector? = Icons.Rounded.PlayArrow,
     width: Dp = 216.dp,
     brush: Brush = Brush.horizontalGradient(listOf(Scarlet, Dbz.GiOrange, Dbz.SaiyanGold)),
 ) {
@@ -624,32 +623,36 @@ private fun PlayButton(
         padding = PaddingValues(horizontal = 18.dp, vertical = 7.dp),
         onClick = onClick,
     ) {
-        Row(
+Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                icon,
-                stringResource(label),
-                Modifier.size(22.dp),
-                tint = if (installed) Color.White else Color.White.copy(alpha = 0.45f),
-            )
-            Spacer(Modifier.width(6.dp))
+            if (icon != null) {
+                Icon(
+                    icon,
+                    stringResource(label),
+                    Modifier.size(22.dp),
+                    tint = if (installed) Color.White else Color.White.copy(alpha = 0.45f),
+                )
+                Spacer(Modifier.width(6.dp))
+            }
             Column {
                 Text(
-                        stringResource(label),
+                    stringResource(label),
                     style = MaterialTheme.typography.titleMedium.copy(shadow = Shadow(Color.Black, Offset(1f, 1f))),
                     fontWeight = FontWeight.Black,
                     fontStyle = FontStyle.Italic,
                     color = if (installed) Color.White else Color.White.copy(alpha = 0.45f),
                 )
-                Text(
-                    dataLabel.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.75f),
-                    maxLines = 1,
-                )
+                if (sub.isNotEmpty()) {
+                    Text(
+                        sub.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.75f),
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

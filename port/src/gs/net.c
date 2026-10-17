@@ -45,6 +45,7 @@ extern int Port_PadRead(int socket, unsigned char *data); /* gs_input.c: the key
 void Port_NetLeave(void);
 void Port_NetSessionBegin(int role, const char *address, int port); /* below; a session in this process (Android) */
 void Port_NetSessionEnd(void);
+void Match_Room(const char *code, const char *key); /* net_match.c: the room a launcher-made match came from */
 
 enum { PAD = 18, RING = 4096, REDUNDANT = 16, MAGIC = 0x4E335442 /* "BT3N" */ };
 enum { T_HELLO = 1, T_HELLO_ACK = 2, T_INPUT = 3, T_BYE = 4, T_PING = 5, T_PONG = 6, T_CONFIG = 7, T_CONFIG_ACK = 8,
@@ -913,6 +914,8 @@ int Port_NetActive(void) {
         if (host != NULL || join != NULL) {
             sSession = getenv("BT3_NET_SESSION") != NULL;
             sFromBoot = sSession; /* this copy was started for that session (the launcher did it), not joined from inside */
+            /* the launcher did the matchmaking, so it hands over the room: the result is said against it (net_match.c) */
+            Match_Room(getenv("BT3_NET_ROOM"), getenv("BT3_NET_KEY"));
             net_start(host != NULL ? 1 : 2, host, join);
         }
     }

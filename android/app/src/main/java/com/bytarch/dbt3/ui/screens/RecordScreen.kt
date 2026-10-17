@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytarch.dbt3.AppViewModel
 import com.bytarch.dbt3.R
 import com.bytarch.dbt3.data.BattleRecord
+import com.bytarch.dbt3.data.MatchLobby
 import com.bytarch.dbt3.ui.components.EmptyState
 import com.bytarch.dbt3.ui.components.HudHeader
 import com.bytarch.dbt3.ui.components.StatPill
@@ -42,6 +43,7 @@ import java.util.Locale
 @Composable
 fun RecordScreen(vm: AppViewModel, onBack: () -> Unit) {
     val record by vm.record.collectAsStateWithLifecycle()
+    val mine by vm.myRecord.collectAsStateWithLifecycle()
     val stamp = remember { SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()) }
     val won = record.count { it.won == true }
     val lost = record.count { it.won == false }
@@ -55,6 +57,8 @@ fun RecordScreen(vm: AppViewModel, onBack: () -> Unit) {
         item {
             HudHeader(stringResource(R.string.record_title), stringResource(R.string.record_sub), onBack)
         }
+        // the service's copy of this player's record: it follows the recovery code, and is what other players see
+        item { ServiceRecord(mine) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 StatPill(stringResource(R.string.record_played), record.size.toString(), Dbz.KiBlue, Modifier.weight(1f))
@@ -75,6 +79,31 @@ fun RecordScreen(vm: AppViewModel, onBack: () -> Unit) {
             items(record, key = { "${it.at}|${it.mode}|${it.winner}|${it.me}" }) { r ->
                 RecordRow(r) { stamp.format(Date(r.at)) }
             }
+        }
+    }
+}
+
+/** The record the service holds, which follows the recovery code to any machine: other players are told this, and
+ *  the public id is what they can look it up by. Nothing here when the service has not heard of this player yet. */
+@Composable
+private fun ServiceRecord(mine: MatchLobby.MyRecord) {
+    if (mine.id.isEmpty()) return
+    Card(
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                stringResource(R.string.record_service, mine.wins, mine.losses),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                color = Dbz.SaiyanGold,
+            )
+            Text(
+                stringResource(R.string.record_public_id, mine.id),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

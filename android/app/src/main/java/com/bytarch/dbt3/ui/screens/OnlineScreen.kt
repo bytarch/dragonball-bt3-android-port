@@ -142,6 +142,22 @@ fun OnlineScreen(vm: AppViewModel, onBack: () -> Unit) {
                     )
                 }
                 if (state.peer.isNotEmpty()) Text(stringResource(R.string.online_peer, state.peer))
+                // the other player, as the service knows them: their record is public, and this is their public id
+                if (state.peerRecord != null) {
+                    Text(
+                        stringResource(R.string.online_peer_record, state.peerRecord.first, state.peerRecord.second),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = Dbz.ShenronGreen,
+                    )
+                }
+                if (state.peerId.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.online_peer_id, state.peerId),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (state.error.isNotEmpty()) Text(state.error)
                 if (state.phase != OnlinePhase.CONNECTING) {
                     TextButton(onClick = { vm.onlineCancel() }) { Text(stringResource(R.string.online_cancel)) }
