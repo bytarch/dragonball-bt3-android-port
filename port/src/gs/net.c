@@ -730,7 +730,7 @@ static void net_start(int role, const char *host, const char *join) {
         const char *usr = getenv("BT3_TURN_USER"), *pwd = getenv("BT3_TURN_CRED"), *srv = getenv("BT3_TURN_SERVER");
         struct sockaddr_in permit = sMode == 1 && sCodePunchSet ? sCodePunch : sPeer; /* who may come in through it */
         char relay[64];
-        if (usr != NULL && pwd != NULL && Relay_Allocate(sSock, srv, usr, pwd, relay, sizeof(relay)) && !STOPPED()) {
+        if (usr != NULL && pwd != NULL && Relay_Allocate(sSock, srv, usr, pwd, relay, sizeof(relay))) {
             fprintf(stderr, "bt3: net: relay %s\n", relay);
             if (permit.sin_addr.s_addr != 0) {
                 Relay_Permit(sSock, &permit);
