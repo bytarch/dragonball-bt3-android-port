@@ -737,6 +737,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
+                        android.util.Log.w("dbt3online", "online: $quick host=$host code=$code", e)
                         _online.value = OnlineState(OnlinePhase.FAILED, error = onlineError(e))
                     } finally {
                         val room = onlineRoom

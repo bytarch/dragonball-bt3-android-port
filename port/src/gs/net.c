@@ -43,6 +43,8 @@ typedef int socklen_t;
 
 extern int Port_PadRead(int socket, unsigned char *data); /* gs_input.c: the keyboard and the controllers */
 void Port_NetLeave(void);
+void Port_NetSessionBegin(int role, const char *address, int port); /* below; a session in this process (Android) */
+void Port_NetSessionEnd(void);
 
 enum { PAD = 18, RING = 4096, REDUNDANT = 16, MAGIC = 0x4E335442 /* "BT3N" */ };
 enum { T_HELLO = 1, T_HELLO_ACK = 2, T_INPUT = 3, T_BYE = 4, T_PING = 5, T_PONG = 6, T_CONFIG = 7, T_CONFIG_ACK = 8,
@@ -759,13 +761,21 @@ static void net_start(int role, const char *host, const char *join) {
             Port_UiNotice("The other player's game is a different version.");
             if (sSession) {
                 Port_NetLeave();
+#ifdef __ANDROID__
+                return; /* the game is this process again (as in ended()) */
+#endif
             }
             exit(2);
         }
         SDL_Delay(2);
         if (now - t0 > 120000000000ull) {
             fprintf(stderr, "bt3: net: nobody answered in two minutes\n");
+#ifdef __ANDROID__
+            Port_NetSessionEnd(); /* no session began: the socket goes, the game carries on */
+            return;
+#else
             exit(2);
+#endif
         }
     }
     /* Setting up. The host measures the round trip (a dozen pings, the smallest counts), chooses the input delay
@@ -936,6 +946,9 @@ static void ended(const char *why, unsigned tick) {
     Port_UiNotice(why);
     if (sSession) {
         Port_NetLeave(); /* back to the game as it normally is */
+#ifdef __ANDROID__
+        return; /* the game is this process again: net_start returns and the caller's unwind finishes it (state.c) */
+#endif
     }
     exit(2);
 }
@@ -1138,6 +1151,17 @@ int Port_NetView(void) {
 #endif
 
 static void relaunch(int role, const char *join, int port) {
+#ifdef __ANDROID__
+    /* There is no program to start again here: /proc/self/exe is the app's runtime, not this game, and execing it
+       jumps to address 0 (a session that ends crashes the process). On Android a session runs inside this process
+       (Port_NetSessionBegin), so starting one is that, and ending one is only the game again. */
+    if (role != 0) {
+        Port_NetSessionBegin(role, join, port);
+    } else {
+        fprintf(stderr, "bt3: net: back to the game (Android)\n");
+    }
+    return;
+#endif
     char value[160];
 #ifdef _WIN32
     char exe[1024];

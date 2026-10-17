@@ -949,4 +949,11 @@ relay address (it still connects directly).
   (the lobby has the same window).
 - PLAY and the home-screen shortcut clear the session lines (GamePaths.setSessionEnv(null)): only a found match
   writes them. Nothing writes BT3_NET_OPEN any more; the engine's switch stays for anyone who wants it.
+- A session that ended used to end the whole process, the desktop way: `relaunch()` execs `/proc/self/exe`, which on
+  Android is the app's runtime and not this game, so the game died with signal 11 at address 0 the moment a session
+  finished (or was lost) - a launcher match looked as if it "just exited", and the other side saw the packets stop.
+  Android now goes back to being the game instead: `relaunch()` starts a session with `Port_NetSessionBegin` and
+  returns when one ends, `ended()` and the two-minute wait return from `net_start` rather than `exit(2)`, and the
+  unwind the caller already does (state.c: the kept state, `Gs_StateBack`, the resync) finishes the return.
+  (A pair that cannot be reached still goes through the in-game lobby, which has the relay.)
 - Not tried yet: two devices with this build, a real pairing.
