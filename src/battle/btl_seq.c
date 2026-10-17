@@ -1240,10 +1240,23 @@ extern s32 BtlSeq_TickClocksExt(void) __asm__("BtlSeq_TickClocks");
 s32 BtlSeq_CheckBattleEnd(void) {
     BattleResult *result = Battle_GetResult();
     s32 timeUp;
+#ifdef PORT
+    static s32 sRecorded; /* the fight just recorded (bt3_battles.txt); cleared while the next one is undecided */
+#endif
 
     if (result->winner & 0x1F) {
+#ifdef PORT
+        if (!sRecorded) {
+            extern void Port_RecordBattle(int mode, int winner, int reason); /* port/src/plat_records.c: bt3_battles.txt */
+            sRecorded = 1;
+            Port_RecordBattle(Battle_GetMode(), result->winner, result->reason);
+        }
+#endif
         return 1;
     }
+#ifdef PORT
+    sRecorded = 0;
+#endif
     if (BtlSeq_GetEndCheckOff()) {
         return 0;
     }
