@@ -429,6 +429,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Downloads a catalog item and hands it to the same importer a picked file would go to: a texture pack to the
+     * pack list, anything else (.unk stage, .adx song, or a zip of either) down the mod path.
+     */
+    fun downloadAsset(url: String, name: String?, kind: String) {
+        if (kind == "texture") {
+            downloadTexturePack(url, name)
+            return
+        }
+        val u = url.trim()
+        if (!u.startsWith("https://")) {
+            say(str(R.string.err_https_only))
+            return
+        }
+        work(str(R.string.busy_download_item)) {
+            paths.temp.mkdirs()
+            val ext = u.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "").ifBlank { "zip" }
+            val file = File(paths.temp, "download-${System.currentTimeMillis()}.$ext")
+            try {
+                Net.download(u, file) { done, total ->
+                    setDetail(str(R.string.progress_downloading, formatBytes(done)) + if (total > 0) " / ${formatBytes(total)}" else "")
+                }
+                mods.import(Uri.fromFile(file)) { setDetail(it) }
+                refreshMods()
+                say(str(R.string.msg_added, name ?: file.nameWithoutExtension))
+            } finally {
+                file.delete()
+            }
+        }
+    }
+
     // ---- app updates (GitHub releases)
 
     private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)

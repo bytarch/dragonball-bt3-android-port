@@ -35,9 +35,13 @@ import com.bytarch.dbt3.data.formatBytes
 
 private const val SEARCH_URL = "https://www.google.com/search?q=Dragon+Ball+Z+Budokai+Tenkaichi+3+texture+pack+PCSX2+dds"
 
-/** Packs from the catalog (android/texture-packs.json in the repository), a field for any direct .zip link, and a web search. */
+/**
+     * Packs from the catalog (android/texture-packs.json in the repository). With [kind] it lists only that kind
+     * (stage, song, mod) and hides the link field; without one it is the texture pack screen, with a field for any
+     * direct .zip link and a web search.
+     */
 @Composable
-fun TextureDownloadDialog(vm: AppViewModel, onDismiss: () -> Unit) {
+fun TextureDownloadDialog(vm: AppViewModel, onDismiss: () -> Unit, kind: String? = null) {
     val catalog by vm.catalog.collectAsStateWithLifecycle()
     var link by remember { mutableStateOf("") }
     val uri = LocalUriHandler.current
@@ -45,7 +49,7 @@ fun TextureDownloadDialog(vm: AppViewModel, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.tex_dl_title)) },
+        title = { Text(stringResource(if (kind == null) R.string.tex_dl_title else R.string.content_dl_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (val c = catalog) {
@@ -54,19 +58,26 @@ fun TextureDownloadDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                         Text(stringResource(R.string.tex_dl_loading), Modifier.padding(start = 12.dp))
                     }
                     CatalogState.Failed -> Text(stringResource(R.string.tex_dl_failed), color = MaterialTheme.colorScheme.error)
-                    is CatalogState.Loaded -> if (c.packs.isEmpty()) {
-                        Text(stringResource(R.string.tex_dl_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else c.packs.forEach { p ->
+                    is CatalogState.Loaded -> {
+                        val packs = c.packs.filter { kind == null || it.kind == kind }
+                    if (packs.isEmpty()) {
+                        Text(
+                            stringResource(if (kind == null) R.string.tex_dl_empty else R.string.content_dl_empty),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else packs.forEach { p ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(p.name, style = MaterialTheme.typography.titleSmall)
                                 val sub = listOfNotNull(p.description.takeIf { it.isNotBlank() }, p.size.takeIf { it > 0 }?.let { formatBytes(it) }).joinToString(" · ")
                                 if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Button(onClick = { vm.downloadTexturePack(p.url, p.name); onDismiss() }) { Text(stringResource(R.string.tex_dl_get)) }
+                            Button(onClick = { vm.downloadAsset(p.url, p.name, p.kind); onDismiss() }) { Text(stringResource(R.string.tex_dl_get)) }
                         }
                     }
+                    }
                 }
+                if (kind == null) {
                 HorizontalDivider()
                 Text(stringResource(R.string.tex_dl_link), style = MaterialTheme.typography.titleSmall)
                 OutlinedTextField(
@@ -79,6 +90,7 @@ fun TextureDownloadDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     onClick = { vm.downloadTexturePack(link, null); onDismiss() },
                 ) { Text(stringResource(R.string.tex_dl_get)) }
                 TextButton(onClick = { runCatching { uri.openUri(SEARCH_URL) } }) { Text(stringResource(R.string.tex_dl_search)) }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },

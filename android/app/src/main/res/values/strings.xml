@@ -143,6 +143,11 @@
     <string name="textures_empty">No pack installed</string>
     <string name="textures_empty_text">Tap \"Add pack\" and pick the .zip. The app unpacks the textures (.dds or .png) into the right folder and the game uses them the next time it starts.</string>
     <string name="add_pack">Add pack</string>
+    <string name="add_files">Add files</string>
+    <string name="content_dl_button">Download</string>
+    <string name="content_dl_title">Downloads</string>
+    <string name="content_dl_empty">The list has nothing for this screen yet. Try again later, or add a file from the device.</string>
+    <string name="busy_download_item">Downloading item</string>
     <string name="delete_q">Delete \"%1$s\"?</string>
     <string name="delete_pack_text">%1$s will be freed. To use it again, import the zip again.</string>
     <string name="pack_info">%1$d textures · %2$s</string>

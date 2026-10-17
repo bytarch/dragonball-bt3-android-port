@@ -95,7 +95,7 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
     var deleteExtra by remember { mutableStateOf<Pair<ExtraKind, ExtraItem>?>(null) }
     var deletePack by remember { mutableStateOf<TexturePack?>(null) }
     var rename by remember { mutableStateOf<Pair<ExtraKind, ExtraItem>?>(null) }
-    var downloading by remember { mutableStateOf(false) }
+    var downloadKind by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         Image(
@@ -161,7 +161,7 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
                                 Text(stringResource(R.string.add_pack))
                             }
                             OutlinedButton(
-                                onClick = { downloading = true },
+                                onClick = { downloadKind = "texture" },
                                 modifier = Modifier.weight(1f),
                                 shape = MaterialTheme.shapes.large,
                             ) {
@@ -186,6 +186,13 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
                     }
                 }
                 1 -> {
+                    item {
+                        AddRow(
+                            stringResource(R.string.add_files),
+                            onAdd = { pickFiles.launch(arrayOf("*/*")) },
+                            onDownload = { downloadKind = "mod" },
+                        )
+                    }
                     if (mods.isEmpty()) {
                         item {
                             EmptyState(
@@ -206,6 +213,13 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
                 else -> {
                     val kind = if (tab == 2) ExtraKind.STAGE else ExtraKind.SONG
                     val list = if (tab == 2) stages else songs
+                    item {
+                        AddRow(
+                            stringResource(R.string.add_files),
+                            onAdd = { pickFiles.launch(arrayOf("*/*")) },
+                            onDownload = { downloadKind = if (kind == ExtraKind.STAGE) "stage" else "song" },
+                        )
+                    }
                     if (list.isEmpty()) {
                         item {
                             if (kind == ExtraKind.STAGE) {
@@ -234,7 +248,7 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
         }
     }
 
-    if (downloading) TextureDownloadDialog(vm) { downloading = false }
+    downloadKind?.let { kind -> TextureDownloadDialog(vm, onDismiss = { downloadKind = null }, kind = kind) }
 
     deleteMod?.let { m ->
         ConfirmDelete(stringResource(R.string.delete_mod_q, m.name), onConfirm = { vm.deleteMod(m) }, onDismiss = { deleteMod = null })
@@ -267,6 +281,23 @@ fun BattlePassScreen(vm: AppViewModel, onBack: () -> Unit) {
             confirmButton = { TextButton(onClick = { rename = null; vm.renameExtra(kind, item, text) }) { Text(stringResource(R.string.save)) } },
             dismissButton = { TextButton(onClick = { rename = null }) { Text(stringResource(R.string.cancel)) } },
         )
+    }
+}
+
+/** The two ways something gets in: a file from the device, or the list of downloads for this screen. */
+@Composable
+private fun AddRow(addLabel: String, onAdd: () -> Unit, onDownload: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(onClick = onAdd, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.large) {
+            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+            Spacer(Modifier.size(8.dp))
+            Text(addLabel)
+        }
+        OutlinedButton(onClick = onDownload, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.large) {
+            Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
+            Spacer(Modifier.size(8.dp))
+            Text(stringResource(R.string.content_dl_button))
+        }
     }
 }
 

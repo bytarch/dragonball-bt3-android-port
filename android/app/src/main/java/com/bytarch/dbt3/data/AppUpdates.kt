@@ -79,7 +79,7 @@ object AppUpdates {
     }
 }
 
-data class CatalogPack(val name: String, val description: String, val url: String, val size: Long)
+data class CatalogPack(val name: String, val description: String, val url: String, val size: Long, val kind: String = "texture")
 
 sealed interface CatalogState {
     object Loading : CatalogState
@@ -90,9 +90,11 @@ sealed interface CatalogState {
 /**
  * The list of texture packs the app offers to download: android/texture-packs.json in the repository, read from
  * `main`, so packs can be added or fixed without a new app version.
- * Format: {"packs":[{"name":"…","description":"…","url":"https://…/pack.zip","size":123456}]}
+ * Format: {"packs":[{"name":"…","description":"…","url":"https://…/pack.zip","size":123456,"kind":"texture"}]}
+ * kind: texture | stage | song | mod. Missing means texture, so entries written before kinds existed still work.
  */
 object TextureCatalog {
+    val KINDS = setOf("texture", "stage", "song", "mod")
     const val URL = "https://raw.githubusercontent.com/$REPO/main/android/texture-packs.json"
 
     suspend fun load(): List<CatalogPack> {
@@ -101,7 +103,10 @@ object TextureCatalog {
             val o = arr.getJSONObject(it)
             val url = o.optString("url")
             if (!url.startsWith("https://")) null
-            else CatalogPack(o.optString("name", "Texture pack"), o.optString("description"), url, o.optLong("size", -1))
+            else CatalogPack(
+                o.optString("name", "Texture pack"), o.optString("description"), url, o.optLong("size", -1),
+                o.optString("kind", "texture").lowercase().takeIf { it in KINDS } ?: "texture",
+            )
         }
     }
 }
