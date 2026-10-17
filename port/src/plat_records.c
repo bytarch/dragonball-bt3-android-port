@@ -15,9 +15,12 @@
 #include <string.h>
 #include <time.h>
 
+static int sRecorded; /* a fight of this session has been written (a judged one, or an abandoned one) */
+
 void Port_RecordBattle(int mode, int winner, int reason, int me) {
     FILE *f;
 
+    sRecorded = 1;
     fprintf(stderr, "bt3: battle record: mode=%d winner=%d reason=%d me=%d\n", mode, winner, reason, me); /* temporary */
     if (!(winner & 7)) {
         return;
@@ -29,4 +32,22 @@ void Port_RecordBattle(int mode, int winner, int reason, int me) {
     }
     fprintf(f, "%d|%d|%d|%ld|%d\n", mode, winner, reason, (long)time(NULL), me);
     fclose(f);
+}
+
+/* Whether a judged fight has already written its line: the session's end asks, and only writes an abandoned match
+   when the fight itself was never judged (a fight that was fought to the end is not written twice). */
+int Port_RecordDecided(void) {
+    return sRecorded;
+}
+
+/* A session that ended without a result: the other player went away ([won] 1, this side was left behind) or this
+   player left ([won] 0). The line says who the fight would have gone to, with reason 8 (nobody was knocked out). */
+void Port_RecordAbandon(int me, int won) {
+    int side;
+
+    if (sRecorded) {
+        return;
+    }
+    side = won ? me : 1 - me; /* the side the fight would have gone to; winner bits are 1 for side 0, 2 for side 1 */
+    Port_RecordBattle(0, side == 1 ? 2 : 1, 8, me);
 }

@@ -168,6 +168,52 @@ void Match_Report(int won) {
     SDL_CreateThread(report_thread, "bt3record", w);
 }
 
+/* The session ended without the fight being judged: a player quit, or the connection went (Port_NetLeave). [won] is
+   1 when the other player was the one who went away, 0 when this player left. The service is told, because an
+   abandoned match is still a match: whoever was left behind won it and the one who left lost it - and the one who
+   left cannot say so (its game may simply be gone), so this side's report alone settles it. The caller waits a
+   moment for the POST, because on Android the program is about to end. */
+static int SDLCALL abandon_thread(void *arg) {
+    char code[8], key[40], body[224], answer[512];
+    int *w = (int *)arg;
+
+    SDL_LockMutex(sM.lock);
+    SDL_strlcpy(code, sRoomCode, sizeof(code));
+    SDL_strlcpy(key, sRoomKey, sizeof(key));
+    SDL_strlcpy(sRoomCode, "", sizeof(sRoomCode)); /* said once: a judged fight's own report must not follow it */
+    SDL_strlcpy(sRoomKey, "", sizeof(sRoomKey));
+    SDL_UnlockMutex(sM.lock);
+    if (code[0] == '\0' || key[0] == '\0') {
+        SDL_free(w);
+        return 0;
+    }
+    SDL_snprintf(body, sizeof(body),
+                 "{\"code\":\"%s\",\"key\":\"%s\",\"id\":\"%s\",\"won\":%s,\"rated\":true,\"abandoned\":true}", code,
+                 key, Port_NetId(), w[0] != 0 ? "true" : "false");
+    http_post("result", body, answer, sizeof(answer));
+    fprintf(stderr, "bt3: net: said the match was abandoned (room %s, %s won)\n", code,
+            w[0] != 0 ? "this side" : "the other side");
+    SDL_free(w);
+    return 0;
+}
+
+void Match_SessionEnd(int won) {
+    int *w = (int *)SDL_malloc(sizeof(int));
+    SDL_Thread *t;
+    int done = 0;
+
+    if (w == NULL) {
+        return;
+    }
+    w[0] = won;
+    t = SDL_CreateThread(abandon_thread, "bt3gone", w);
+    if (t == NULL) {
+        SDL_free(w);
+        return;
+    }
+    SDL_WaitThreadTimeout(t, &done, 3000); /* the POST is small; the program is ending and must not cut it short */
+}
+
 /* The record shown by Profile: the service is asked on its own thread, and the answer is kept between requests so the
    window never waits on HTTPS. Match_AskRecord decides how often (see below: the service's own limit on questions is
    what sets the pace, not how fast the window is drawn). */

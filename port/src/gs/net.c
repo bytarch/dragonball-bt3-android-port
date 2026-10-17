@@ -46,6 +46,9 @@ void Port_NetLeave(void);
 void Port_NetSessionBegin(int role, const char *address, int port); /* below; a session in this process (Android) */
 void Port_NetSessionEnd(void);
 void Match_Room(const char *code, const char *key); /* net_match.c: the room a launcher-made match came from */
+void Match_SessionEnd(int won);                     /* net_match.c: the match ended without a result (a player left) */
+void Port_RecordAbandon(int me, int won);           /* plat_records.c: bt3_battles.txt, for a match nobody finished */
+int Port_RecordDecided(void);
 
 enum { PAD = 18, RING = 4096, REDUNDANT = 16, MAGIC = 0x4E335442 /* "BT3N" */ };
 enum { T_HELLO = 1, T_HELLO_ACK = 2, T_INPUT = 3, T_BYE = 4, T_PING = 5, T_PONG = 6, T_CONFIG = 7, T_CONFIG_ACK = 8,
@@ -947,10 +950,13 @@ static void sample_local(unsigned tick) {
 
 #define QUIET_NS 6000000000ull /* this long without the input the game is waiting for: the other player is gone */
 
+static int sPeerGone; /* the session ended because the other player was lost, not because this one left (Port_NetLeave) */
+
 static void ended(const char *why, unsigned tick) {
     fprintf(stderr, "bt3: net: %s (blank %u)\n", why, tick);
     Port_UiNotice(why);
     if (sSession) {
+        sPeerGone = 1;
         Port_NetLeave(); /* back to the game as it normally is */
 #ifdef __ANDROID__
         return; /* the game is this process again: net_start returns and the caller's unwind finishes it (state.c) */
@@ -1312,6 +1318,13 @@ void Port_NetArrived(void) {
    normally is. */
 void Port_NetLeave(void) {
     fprintf(stderr, "bt3: net: the session has ended\n");
+    /* A session that ended without the fight being judged (the other player went away, or this player left) still
+       counts: the side that was left behind won it. The local record says so when no judged fight wrote a line, and
+       the service is told, because the player who left cannot say it (net_match.c). */
+    if (!Port_RecordDecided()) {
+        Port_RecordAbandon(sMe, sPeerGone);
+        Match_SessionEnd(sPeerGone);
+    }
     if (sSock >= 0 && sConnected) { /* tell the other side, so that it does not wait for input that will not come */
         uint32_t bye[2] = {MAGIC, T_BYE};
         int k;

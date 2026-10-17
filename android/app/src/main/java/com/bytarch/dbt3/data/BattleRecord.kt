@@ -14,6 +14,9 @@ data class BattleRecord(val mode: Int, val winner: Int, val reason: Int, val at:
     val ko: Boolean get() = reason and 0x1 != 0
     val timeUp: Boolean get() = reason and 0x2 != 0
 
+    /** Nobody was knocked out: a player left, or the connection went, and the session ended without a result. */
+    val abandoned: Boolean get() = reason and 0x8 != 0
+
     companion object {
         /** The record so far, newest first. A line that does not read as one is skipped rather than guessed at. */
         fun read(root: File): List<BattleRecord> = runCatching {

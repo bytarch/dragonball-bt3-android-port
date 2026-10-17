@@ -121,6 +121,7 @@ private fun RecordRow(r: BattleRecord, whenText: () -> String) {
     val why = when {
         r.ko -> stringResource(R.string.record_ko)
         r.timeUp -> stringResource(R.string.record_time_up)
+        r.abandoned -> stringResource(R.string.record_abandoned)
         else -> stringResource(R.string.record_reason_other, r.reason)
     }
     Card(

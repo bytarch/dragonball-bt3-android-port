@@ -321,6 +321,7 @@
     <string name="record_result_unknown">—</string>
     <string name="record_ko">Nocaute</string>
     <string name="record_time_up">Tempo esgotado</string>
+    <string name="record_abandoned">Jogador saiu</string>
     <string name="record_reason_other">Motivo %1$d</string>
     <string name="record_empty">Nenhuma partida ainda</string>
     <string name="record_empty_text">Termine uma partida online e ela fica escrita aqui.</string>

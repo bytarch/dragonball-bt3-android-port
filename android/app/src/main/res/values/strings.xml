@@ -401,6 +401,7 @@
     <string name="record_result_unknown">—</string>
     <string name="record_ko">K.O.</string>
     <string name="record_time_up">Time up</string>
+    <string name="record_abandoned">Player left</string>
     <string name="record_reason_other">Reason %1$d</string>
     <string name="record_empty">No battles yet</string>
     <string name="record_empty_text">Finish an online battle and it is written down here.</string>

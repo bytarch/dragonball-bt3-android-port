@@ -977,6 +977,14 @@ relay address (it still connects directly).
   code or public id, writing nothing. The launcher shows the opponent's record and public id while a match is being
   opened, and its own service record and public id on the record screen (refreshed on every resume, like the local
   file next to it). `check_public` in the service's selftest is what proves all of this.
+- **An abandoned match counts, and it is the player who left who loses.** The game knows why a session ended (net.c
+  `ended()`: the other player was lost) and says so at the end of a session that no judged fight ended (Port_NetLeave
+  -> `Match_SessionEnd`, and the local file gets the line through `Port_RecordAbandon` with reason 8 = "player left").
+  The service report carries `abandoned`, and the settle rules (`rank_settle`) are: both sides disagreeing, as before,
+  or one side alone when that side says the match was abandoned - the player who left cannot say anything, and the
+  side left behind wins it. A match fought to the end still needs both sides, so a claimed win alone is worth
+  nothing. `check_abandoned` in the selftest covers the leaver's silence, its late report, the leaver's confession
+  and the untouched ordinary match.
 - A session that ended used to end the whole process, the desktop way: `relaunch()` execs `/proc/self/exe`, which on
   Android is the app's runtime and not this game, so the game died with signal 11 at address 0 the moment a session
   finished (or was lost) - a launcher match looked as if it "just exited", and the other side saw the packets stop.
