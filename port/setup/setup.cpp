@@ -288,7 +288,7 @@ static void load_backdrop(void) {
         SDL_zero(ci);
         ci.type = SDL_GPU_TEXTURETYPE_2D;
         ci.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-        ci.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COPY_DST;
+        ci.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER; // SDL3 adds the copy usage itself
         ci.width = img.width;
         ci.height = img.height;
         ci.layer_count_or_depth = 1;
@@ -311,13 +311,20 @@ static void load_backdrop(void) {
                 memcpy(mapped, img.rgba, ti.size);
             }
             SDL_UnmapGPUTransferBuffer(sDevice, tb);
-            SDL_GPUTransferBufferRegion region;
-            SDL_zero(region);
-            region.transfer_buffer = tb;
-            region.offset = 0;
-            region.size = ti.size;
+            SDL_GPUTextureTransferInfo source; // where the picture is in the transfer buffer, row by row
+            SDL_zero(source);
+            source.transfer_buffer = tb;
+            source.offset = 0;
+            source.pixels_per_row = (Uint32)img.width;
+            source.rows_per_layer = (Uint32)img.height;
+            SDL_GPUTextureRegion target;        // the whole texture
+            SDL_zero(target);
+            target.texture = tex;
+            target.w = (Uint32)img.width;
+            target.h = (Uint32)img.height;
+            target.d = 1;
             SDL_GPUCopyPass *cp = SDL_BeginGPUCopyPass(cmd);
-            SDL_UploadToGPUTexture(cp, &region, tex, NULL, 0);
+            SDL_UploadToGPUTexture(cp, &source, &target, false);
             SDL_EndGPUCopyPass(cp);
             SDL_SubmitGPUCommandBuffer(cmd);
             SDL_ReleaseGPUTransferBuffer(sDevice, tb);
@@ -761,7 +768,7 @@ static void state_icon(State st, float t) {
 static void step_list(const std::vector<StepRow> &rows) {
     float t = (float)SDL_GetTicks() / 1000.0f;
     for (size_t i = 0; i < rows.size(); i++) {
-        StepRow &r = rows[i];
+        const StepRow &r = rows[i];
         char clock[32] = "";
         state_icon(r.state, t);
         ImGui::SameLine(0.0f, 14.0f);
