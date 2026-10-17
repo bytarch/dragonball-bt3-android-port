@@ -81,7 +81,7 @@ fun ControlsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
     Column(
         Modifier.stageBackdrop(R.drawable.battlepass_bg, 0.9f)
-        Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
+        .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HudHeader(stringResource(R.string.nav_controls), stringResource(R.string.controls_subtitle), onBack)
