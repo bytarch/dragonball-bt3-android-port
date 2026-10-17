@@ -72,5 +72,6 @@ class GamePaths(context: Context) {
     private val sessionKeys = listOf(
         "BT3_NET_SESSION", "BT3_NET_HOST", "BT3_NET_JOIN", "BT3_NET_LOCALPORT", "BT3_NET_PUNCH",
         "BT3_NET_RULES", "BT3_SAVES", "BT3_SOUND_TICKS", "BT3_NOMOVIE",
+        "BT3_TURN_SERVER", "BT3_TURN_USER", "BT3_TURN_CRED",
     )
 }

@@ -723,6 +723,22 @@ static void net_start(int role, const char *host, const char *join) {
         }
         fprintf(stderr, "bt3: net: joining %s (player 2)...\n", join);
     }
+    /* A relay address for this side, asked for the moment the session starts: the launcher took one on this very port
+       before the game began (it published that address to the service, so the other player was told it), and the same
+       port to the same server is this allocation - so the address the other player has stays the right one. */
+    if (getenv("BT3_TURN_SERVER") != NULL) {
+        const char *usr = getenv("BT3_TURN_USER"), *pwd = getenv("BT3_TURN_CRED"), *srv = getenv("BT3_TURN_SERVER");
+        struct sockaddr_in permit = sMode == 1 && sCodePunchSet ? sCodePunch : sPeer; /* who may come in through it */
+        char relay[64];
+        if (usr != NULL && pwd != NULL && Relay_Allocate(sSock, srv, usr, pwd, relay, sizeof(relay)) && !STOPPED()) {
+            fprintf(stderr, "bt3: net: relay %s\n", relay);
+            if (permit.sin_addr.s_addr != 0) {
+                Relay_Permit(sSock, &permit);
+            }
+        } else {
+            fprintf(stderr, "bt3: net: no relay address from %s\n", srv);
+        }
+    }
     t0 = SDL_GetTicksNS();
     while (!sConnected) {
         uint64_t now = SDL_GetTicksNS();

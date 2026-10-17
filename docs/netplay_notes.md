@@ -936,6 +936,17 @@ relay address (it still connects directly).
   role from the answer (matched 1 hosts, 2 joins), and the pair it is told is the room it gives up once the two
   machines have a path. The waiting player takes a relay address and publishes it into its queue entry there; not
   here, for the reason above, so a pair made this way is a direct one.
+- A relayed address, so that a pair the internet cannot reach direct can still play: the launcher takes the login
+  the service offers with the room (or with the place in the queue) and asks the TURN server for a relayed address on
+  the same socket it plays the match on (the same two round trips net_relay.c makes, with MD5/HMAC-SHA1 from the
+  platform), then publishes it - into the room, or into the queue entry while waiting. The game is told the login in
+  BT3_TURN_SERVER/BT3_TURN_USER/BT3_TURN_CRED, and net.c:729 takes the allocation over at session start: the same
+  local port to the same server is the same allocation, so the address the other player was told stays right. From
+  there the session is the lobby's: packets from the other player that arrive through the relay are unwrapped and
+  the answers go back the same way (net_relay.c Relay_Unwrap/Relay_IsPeer). Only the hosting side holds one - for the
+  other player the relayed address is an ordinary address, which is what BT3_NET_JOIN is given when no direct
+  address answers. A host that is paired before its first poll has published the address cannot be reached that way
+  (the lobby has the same window).
 - PLAY and the home-screen shortcut clear the session lines (GamePaths.setSessionEnv(null)): only a found match
   writes them. Nothing writes BT3_NET_OPEN any more; the engine's switch stays for anyone who wants it.
 - Not tried yet: two devices with this build, a real pairing.

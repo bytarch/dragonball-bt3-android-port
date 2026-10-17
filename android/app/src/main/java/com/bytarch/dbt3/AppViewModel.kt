@@ -693,15 +693,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         if (addrs.isEmpty()) throw IOException(str(R.string.online_no_internet))
                         if (quick) {
                             // the queue gives the room to whoever waited, so this side hosts only when it was first
-                            val pair = withContext(Dispatchers.IO) {
-                                lobby.quickMatch(name, addrs, 260_000) { ahead, total ->
-                                    _online.value = OnlineState(OnlinePhase.SEARCHING, waiting = ahead, queued = total)
+                            var wait = withContext(Dispatchers.IO) { lobby.queueTake(name, addrs) }
+                            val relay = withContext(Dispatchers.IO) { lobby.takeRelay(wait.turn) } // published on the next poll
+                            var pair = wait.pair
+                            var waited = 0L
+                            while (pair == null && waited < 260_000) {
+                                _online.value = OnlineState(OnlinePhase.SEARCHING, waiting = wait.ahead, queued = wait.total)
+                                delay(2000)
+                                waited += 2000
+                                wait = withContext(Dispatchers.IO) {
+                                    lobby.queuePoll(wait.key, listOfNotNull(relay))
                                 }
-                            } ?: throw IOException(str(R.string.online_nobody))
-                            beginMatch(lobby, pair.peer, host = pair.matched == 1, room = pair.code to pair.key)
+                                pair = wait.pair
+                            }
+                            val found = pair ?: throw IOException(str(R.string.online_nobody))
+                            withContext(Dispatchers.IO) { lobby.queueGiveUp() } // the place is gone: a room is left
+                            beginMatch(lobby, found.peer, host = found.matched == 1, room = found.code to found.key)
                         } else if (host) {
-                            val (room, key) = withContext(Dispatchers.IO) { lobby.host(name, addrs) }
+                            val made = withContext(Dispatchers.IO) { lobby.host(name, addrs) }
+                            val room = made.code
+                            val key = made.key
                             onlineRoom = room to key
+                            // a relayed address for this side, published so that whoever joins can be given one
+                            withContext(Dispatchers.IO) {
+                                val relay = lobby.takeRelay(made.turn)
+                                if (relay != null) lobby.publishAddrs(room, key, addrs + relay)
+                            }
                             _online.value = OnlineState(OnlinePhase.HOSTING, code = room)
                             var peer: MatchLobby.Peer? = null
                             while (peer == null) {
@@ -735,21 +752,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** The other player is known: find which of their addresses really answers, then hand the match to the engine.
-     * [room] is the room the service made for the pair, when it made one; it is given up before the game starts. */
+     * [room] is the room the service made for the pair, when it made one; it is given up before the game starts.
+     * When nothing direct answers, the other side's relayed address is used instead (only the hosting side holds
+     * one, so the path then exists even through a NAT that hides both machines). */
     private suspend fun beginMatch(lobby: MatchLobby, peer: MatchLobby.Peer, host: Boolean, room: Pair<String, String>? = null) {
         _online.value = OnlineState(OnlinePhase.CONNECTING, peer = peer.name)
         val wire = withContext(Dispatchers.IO) { lobby.probe(peer.addrs, 20_000) }
-            ?: throw IOException(str(R.string.online_unreachable))
+            ?: peer.relay.ifEmpty { throw IOException(str(R.string.online_unreachable)) }
         if (room != null) withContext(Dispatchers.IO) { lobby.leave(room.first, room.second) }
         val port = lobby.localPort
         lobby.socket.close() // the engine binds this same port in a moment: see the class comment on MatchLobby
-        startMatch(port, wire, host)
+        startMatch(port, wire, host, lobby.relayLogin)
         _online.value = OnlineState()
     }
 
     /** What net.c reads at boot for a session (the same lines it writes itself before restarting into one): this
-     * side's role, the address found, and the save folder that starts empty. */
-    private fun startMatch(port: Int, peer: String, host: Boolean) {
+     * side's role, the address found, the save folder that starts empty, and the relay login when this side holds a
+     * relayed address (the engine takes the same allocation over, on the same port). */
+    private fun startMatch(port: Int, peer: String, host: Boolean, turn: MatchLobby.Turn?) {
         val vars = mutableMapOf(
             "BT3_NET_SESSION" to "1",
             "BT3_NET_LOCALPORT" to "$port",
@@ -763,6 +783,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             vars["BT3_NET_RULES"] = "768" // single battle, 240 seconds: the game's defaults (net.c sRules)
         } else {
             vars["BT3_NET_JOIN"] = peer
+        }
+        if (turn != null) {
+            vars["BT3_TURN_SERVER"] = turn.server
+            vars["BT3_TURN_USER"] = turn.username
+            vars["BT3_TURN_CRED"] = turn.credential
         }
         paths.setOnlineEnv(false)
         paths.clearNetSession()

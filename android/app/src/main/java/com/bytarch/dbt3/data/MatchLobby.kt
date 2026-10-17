@@ -7,7 +7,6 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.SocketTimeoutException
-import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -50,10 +49,14 @@ class MatchLobby(service: String) {
         ""
     }.getOrDefault("")
 
+    /** A room this side made: the code the other player types, this side's key for it, and the relay login the service
+     * offers (null when it offers none). */
+    data class Hosted(val code: String, val key: String, val turn: Turn?)
+
     /** Makes a room; the code it answers with is what the other player types. */
-    suspend fun host(name: String, addrs: List<String>): Pair<String, String> {
+    suspend fun host(name: String, addrs: List<String>): Hosted {
         val answer = post("host", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs)))
-        return answer.getString("code") to answer.getString("key")
+        return Hosted(answer.getString("code"), answer.getString("key"), turnOf(answer))
     }
 
     /** Whether anyone has joined the room yet; null while it waits. */
@@ -69,31 +72,38 @@ class MatchLobby(service: String) {
     }
 
     /** What one answer of the quick-match queue says. */
-    data class QueueAnswer(val key: String, val ahead: Int, val total: Int, val pair: QueuePair?)
+    data class QueueAnswer(val key: String, val ahead: Int, val total: Int, val pair: QueuePair?, val turn: Turn?)
 
     /** A pair the queue made: [matched] is which side of it this player took (1 waited and hosts, 2 arrived and joins),
      * and [code]/[key] are the room the service made for the pair. */
     data class QueuePair(val matched: Int, val code: String, val key: String, val peer: Peer)
 
+    /** A TURN login, as the service hands it out ({server, username, credential}; RFC 5766 long-term credentials,
+     * the key being MD5 of "user:realm:pass" - port/src/gs/net_relay.c works it the same way). */
+    data class Turn(val server: String, val username: String, val credential: String)
+
+    /** The relayed address this side holds, once it has asked for one, and the login the engine is to take the same
+     * allocation with (BT3_TURN_* in its environment). */
+    var relayAddr: String? = null
+        private set
+    var relayLogin: Turn? = null
+        private set
+
     /** The place in the queue this side is in while it waits: given up when the wait ends (AppViewModel). */
     var queueKey: String? = null
         private set
 
-    /** Quick match: waits in the service's queue until it pairs this side with somebody, or [giveUpMs] passes with
-     * nobody waiting (null then). [onWaiting] carries the numbers the service reports while waiting. The pair is the
-     * same as a room the service made for us: the waiting player hosts, this player joins when it arrived second. */
-    suspend fun quickMatch(name: String, addrs: List<String>, giveUpMs: Long, onWaiting: (ahead: Int, total: Int) -> Unit): QueuePair? {
-        var answer = queueAnswer(post("queue", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs))))
-        var waited = 0L
-        while (answer.pair == null && waited < giveUpMs) {
-            queueKey = answer.key
-            onWaiting(answer.ahead, answer.total)
-            delay(2000)
-            waited += 2000
-            answer = queueAnswer(post("queue", JSONObject().put("key", answer.key)))
-        }
-        queueKey = null // the place is gone: what is left is a room
-        return answer.pair
+    /** Takes a place in the quick-match queue, or is paired at once when somebody is already waiting. */
+    suspend fun queueTake(name: String, addrs: List<String>): QueueAnswer =
+        queueAnswer(post("queue", JSONObject().put("v", VERSION).put("name", name).put("addrs", JSONArray(addrs))))
+
+    /** Asks whether a place in the queue has become a pair yet; [moreAddrs] are published on the way (the relayed
+     * address, once there is one: whoever is paired with this side must be told about it). */
+    suspend fun queuePoll(key: String, moreAddrs: List<String> = emptyList()): QueueAnswer {
+        val body = JSONObject().put("key", key)
+        if (moreAddrs.isNotEmpty()) body.put("addrs", JSONArray(moreAddrs))
+        queueKey = key
+        return queueAnswer(post("queue", body))
     }
 
     /** Gives the place in the queue up (best effort: a pair already made is left alone, and the service forgets a
@@ -113,7 +123,123 @@ class MatchLobby(service: String) {
                 peerOf(answer.optJSONObject("peer")) ?: throw IOException("no peer"),
             )
         else null
-        return QueueAnswer(answer.optString("key", ""), answer.optInt("waiting"), answer.optInt("queue"), pair)
+        return QueueAnswer(answer.optString("key", ""), answer.optInt("waiting"), answer.optInt("queue"), pair, turnOf(answer))
+    }
+
+    /** The login in a service answer ({turn: {...}}, or the three fields at the top of it, as the lobby reads them). */
+    private fun turnOf(answer: JSONObject): Turn? {
+        val t = answer.optJSONObject("turn") ?: answer
+        val server = t.optString("server")
+        val user = t.optString("username")
+        val cred = t.optString("credential")
+        return if (server.isEmpty() || user.isEmpty() || cred.isEmpty()) null else Turn(server, user, cred)
+    }
+
+    /** Asks the service's TURN server for a relayed address on this socket, the way net_relay.c does: once without
+     * the login (the 401 answer carries the realm and the nonce), then signed with it. Cloudflare's service is
+     * sometimes silent on one of its two ports for a whole conversation, so a port that says nothing is tried once
+     * on the other. The engine takes this same allocation over when it starts - the same local port to the same
+     * server - so the address published to the other player stays the right one. */
+    fun takeRelay(turn: Turn?): String? {
+        if (turn == null) return null
+        val host = turn.server.substringBefore(':')
+        val first = turn.server.substringAfter(':', "3478").toIntOrNull() ?: 3478
+        for (port in intArrayOf(first, if (first == 3478) 53 else 3478)) {
+            val relayed = turnOnce(host, port, turn) ?: continue
+            relayAddr = relayed
+            relayLogin = turn
+            return "relay=$relayed"
+        }
+        return null
+    }
+
+    private fun turnOnce(host: String, port: Int, turn: Turn): String? {
+        val server = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return null
+        var realm = ""
+        var nonce = ""
+        socket.soTimeout = 1000
+        for (round in 0 until 2) { // the first ask is without the login; the second is with it
+            val msg = ByteArray(256) // one Allocate request: header, transport, the three login fields, the integrity
+            put16(msg, 0, 0x0003) // Allocate
+            put16(msg, 2, 0)
+            msg[4] = 0x21; msg[5] = 0x12; msg[6] = 0xA4.toByte(); msg[7] = 0x42 // the cookie RFC 5389 asks for
+            ByteArray(12).also { java.util.Random().nextBytes(it) }.copyInto(msg, 8)
+            var at = attr(msg, 20, 0x0019, byteArrayOf(17, 0, 0, 0)) // the transport: UDP
+            if (round == 1) {
+                at = attr(msg, at, 0x0006, turn.username.toByteArray(Charsets.US_ASCII))
+                at = attr(msg, at, 0x0014, realm.toByteArray(Charsets.US_ASCII))
+                at = attr(msg, at, 0x0015, nonce.toByteArray(Charsets.US_ASCII))
+                put16(msg, 2, at - 20 + 24) // the length as it is once the integrity attribute is in it
+                val key = java.security.MessageDigest.getInstance("MD5")
+                    .digest("$turn.username:$realm:${turn.credential}".toByteArray(Charsets.UTF_8))
+                val mac = javax.crypto.Mac.getInstance("HmacSHA1").apply { init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA1")) }
+                    .doFinal(msg.copyOf(at))
+                at = attr(msg, at, 0x0008, mac)
+            }
+            put16(msg, 2, at - 20)
+            runCatching { socket.send(DatagramPacket(msg, at, server, port)) }.getOrElse { return null }
+            val rx = ByteArray(512)
+            val packet = DatagramPacket(rx, rx.size)
+            val deadline = System.nanoTime() + 2_000_000_000L
+            while (System.nanoTime() < deadline) {
+                try {
+                    socket.receive(packet)
+                } catch (e: SocketTimeoutException) {
+                    continue
+                }
+                if (packet.address != server || packet.port != port) continue
+                val type = ((rx[0].toInt() and 0xFF) shl 8) or (rx[1].toInt() and 0xFF)
+                if (type == 0x0103) return xorAddr(rx, packet.length, 0x0016) // the allocation is made
+                if (type == 0x0113) { // an error answer: 401 carries the realm and the nonce to answer with
+                    attrValue(rx, packet.length, 0x0014)?.let { realm = String(it, Charsets.UTF_8) }
+                    attrValue(rx, packet.length, 0x0015)?.let { nonce = String(it, Charsets.UTF_8) }
+                    break
+                }
+            }
+            if (realm.isEmpty() || nonce.isEmpty()) return null // nothing answered: the caller tries the other port
+        }
+        return null
+    }
+
+    /** Adds an attribute to a message being built; returns where the next one goes. */
+    private fun attr(msg: ByteArray, at: Int, type: Int, value: ByteArray): Int {
+        put16(msg, at, type)
+        put16(msg, at + 2, value.size)
+        value.copyInto(msg, at + 4)
+        return at + 4 + (value.size + 3 and 3.inv())
+    }
+
+    private fun put16(b: ByteArray, at: Int, v: Int) {
+        b[at] = (v shr 8).toByte()
+        b[at + 1] = v.toByte()
+    }
+
+    /** The value of an attribute of a received TURN/STUN message, or null. */
+    private fun attrValue(rx: ByteArray, len: Int, type: Int): ByteArray? {
+        var at = 20
+        while (at + 4 <= len) {
+            val t = ((rx[at].toInt() and 0xFF) shl 8) or (rx[at + 1].toInt() and 0xFF)
+            val l = ((rx[at + 2].toInt() and 0xFF) shl 8) or (rx[at + 3].toInt() and 0xFF)
+            if (at + 4 + l > len) return null
+            if (t == type) return rx.copyOfRange(at + 4, at + 4 + l)
+            at += 4 + (l + 3 and 3.inv())
+        }
+        return null
+    }
+
+    /** An XOR-ADDRESS attribute (a relayed or mapped address) as "ip:port". */
+    private fun xorAddr(rx: ByteArray, len: Int, type: Int): String? {
+        val v = attrValue(rx, len, type) ?: return null
+        if (v.size < 8 || v[1].toInt() != 1) return null
+        val cookie = byteArrayOf(0x21, 0x12, 0xA4.toByte(), 0x42)
+        val port = (((v[2].toInt() and 0xFF) xor 0x21) shl 8) or ((v[3].toInt() and 0xFF) xor 0x12)
+        val ip = ByteArray(4) { (v[4 + it].toInt() xor cookie[it].toInt()).toByte() }
+        return "${InetAddress.getByAddress(ip).hostAddress}:$port"
+    }
+
+    /** Publishes more addresses for a room this side hosts (the relayed address goes in here). */
+    suspend fun publishAddrs(code: String, key: String, addrs: List<String>) {
+        runCatching { post("addrs", JSONObject().put("code", code).put("key", key).put("addrs", JSONArray(addrs))) }
     }
 
     /** Gives the room up (best effort: it also runs out on its own once the host stops asking). */
@@ -189,22 +315,12 @@ class MatchLobby(service: String) {
         if (len < 28 || (rx[0].toInt() and 0x80) != 0) return null
         val cookie = byteArrayOf(0x21, 0x12, 0xA4.toByte(), 0x42)
         for (i in 0..3) if (rx[4 + i] != cookie[i]) return null
-        var off = 20
-        while (off + 4 <= len) {
-            val type = ((rx[off].toInt() and 0xFF) shl 8) or (rx[off + 1].toInt() and 0xFF)
-            val size = ((rx[off + 2].toInt() and 0xFF) shl 8) or (rx[off + 3].toInt() and 0xFF)
-            if ((type == 0x0020 || type == 0x0001) && size >= 8 && off + 12 <= len) {
-                var at = ((rx[off + 6].toInt() and 0xFF) shl 8) or (rx[off + 7].toInt() and 0xFF)
-                val ip = rx.copyOfRange(off + 8, off + 12)
-                if (type == 0x0020) {
-                    at = at xor 0x2112
-                    for (i in 0..3) ip[i] = (ip[i].toInt() xor cookie[i].toInt()).toByte()
-                }
-                return "${InetAddress.getByAddress(ip).hostAddress}:$at"
-            }
-            off += 4 + size + (4 - size % 4) % 4
-        }
-        return null
+        xorAddr(rx, len, 0x0020)?.let { return it }
+        val v = attrValue(rx, len, 0x0001) ?: return null // an old server says the address plain
+        if (v.size < 8 || v[1].toInt() != 1) return null
+        val port = ((v[2].toInt() and 0xFF) shl 8) or (v[3].toInt() and 0xFF)
+        val ip = v.copyOfRange(4, 8)
+        return "${InetAddress.getByAddress(ip).hostAddress}:$port"
     }
 
     private suspend fun post(verb: String, body: JSONObject): JSONObject =
@@ -213,13 +329,17 @@ class MatchLobby(service: String) {
     private fun peerOf(peer: JSONObject?): Peer? {
         if (peer == null) return null
         val list = peer.optJSONArray("addrs") ?: JSONArray()
-        // "relay=" and "seen=" entries are the relay's own bookkeeping: a direct path is what this launcher is for
-        val addrs = (0 until list.length()).map { list.optString(it) }.filter { it.isNotEmpty() && !it.contains("=") }
-        return Peer(peer.optString("name", "Player"), addrs)
+        val all = (0 until list.length()).map { list.optString(it) }
+        // "seen=" entries are the relay's own bookkeeping (whom to let through); a "relay=" entry is the other side's
+        // relayed address, kept aside: an ordinary address to try when nothing direct answers
+        val relay = all.firstOrNull { it.startsWith("relay=") }?.removePrefix("relay=").orEmpty()
+        val addrs = all.filter { it.isNotEmpty() && !it.contains("=") }
+        return Peer(peer.optString("name", "Player"), addrs, relay)
     }
 
-    /** The other player: the name to show while connecting, and the addresses to try. */
-    data class Peer(val name: String, val addrs: List<String>)
+    /** The other player: the name to show while connecting, and the addresses to try. [relay] is the other side's
+     * relayed address, when it has one. */
+    data class Peer(val name: String, val addrs: List<String>, val relay: String = "")
 
     companion object {
         /** The game's netcode version (net.c NET_VERSION): the service refuses a mismatched pair, and so should we. */
