@@ -256,6 +256,7 @@ void Dl_Join(void) {
 Image Img_Load(const std::string &path) {
     Image img;
 #ifdef _WIN32
+    UINT pw = 0, ph = 0; // WIC measures in UINT; img keeps ints for the callers
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     IWICImagingFactory *factory = NULL;
     if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)))) {
@@ -268,14 +269,16 @@ Image Img_Load(const std::string &path) {
         SUCCEEDED(decoder->GetFrame(0, &frame)) &&
         SUCCEEDED(factory->CreateFormatConverter(&converter)) &&
         SUCCEEDED(converter->Initialize(frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom)) &&
-        SUCCEEDED(converter->GetSize(&img.width, &img.height))) {
-        img.rgba = (unsigned char *)malloc((size_t)img.width * img.height * 4);
+        SUCCEEDED(converter->GetSize(&pw, &ph))) {
+        img.width = (int)pw;
+        img.height = (int)ph;
+        img.rgba = (unsigned char *)malloc((size_t)pw * ph * 4);
         if (img.rgba == NULL) {
             img.width = img.height = 0;
         } else {
             WICRect rect = {0, 0, img.width, img.height};
-            // (rect, buffer size, buffer): the picture is drawn opaque, so straight RGBA is what the texture wants
-            if (FAILED(converter->CopyPixels(&rect, (UINT)img.width * img.height * 4, img.rgba))) {
+            // (rect, buffer size, stride, buffer): the picture is drawn opaque, so straight RGBA is what the texture wants
+            if (FAILED(converter->CopyPixels(&rect, (UINT)pw * ph * 4, pw * 4, img.rgba))) {
                 free(img.rgba);
                 img.rgba = NULL;
                 img.width = img.height = 0;
