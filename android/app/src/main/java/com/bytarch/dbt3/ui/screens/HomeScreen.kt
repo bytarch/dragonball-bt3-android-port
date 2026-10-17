@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.SystemUpdateAlt
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytarch.dbt3.AppViewModel
@@ -72,8 +74,8 @@ private val Scarlet = Color(0xFFC8102E)
 private val Violet = Color(0xFF8B3BD9)
 private val Muted = Color(0xFFB9C0D0)
 
-/** The lobby: the game's art across the middle, a HUD around it that never covers the stage, and three one-tap
- * things on top - play, the battle pass, the settings. Everything else hangs off the rail and the tabs.
+/** The lobby: the game's art across the middle, a HUD around it that never covers the stage, and four one-tap
+ * things on top - play, online, the battle pass, the settings. Everything else hangs off the rail and the tabs.
  *
  * The screen is three bands - top, middle, bottom - and the middle takes whatever is left, so no two parts of the
  * HUD can end up on top of each other. It is laid out for the shortest case that has to work, a phone in landscape
@@ -175,6 +177,16 @@ fun HomeScreen(
                 HudTab(stringResource(R.string.hud_tab_cheats), false, onOpenCheats)
                 Spacer(Modifier.weight(1f))
                 PlayButton(installed, dataLabel, vm::play)
+                Spacer(Modifier.width(8.dp))
+                PlayButton(
+                    installed,
+                    stringResource(R.string.play_online_sub),
+                    vm::playOnline,
+                    label = R.string.play_online,
+                    icon = Icons.Rounded.Public,
+                    width = 158.dp,
+                    brush = Brush.horizontalGradient(listOf(Violet, Dbz.KiBlue)),
+                )
                 Spacer(Modifier.weight(1f))
                 HudTab(stringResource(R.string.hud_tab_settings), false, onOpenSettings)
                 Spacer(Modifier.width(4.dp))
@@ -470,13 +482,22 @@ private fun CountsCard(mods: Int, packs: Int, stages: Int, songs: Int) {
     }
 }
 
-/** The one control that starts the game. Its shape is the mock's: a point on either side. */
+/** The one control that starts the game. Its shape is the mock's: a point on either side. [label], [icon] and
+ * [brush] are the control's own words: PLAY for the game, ONLINE for the engine's online screen at the main menu. */
 @Composable
-private fun PlayButton(installed: Boolean, dataLabel: String, onClick: () -> Unit) {
+private fun PlayButton(
+    installed: Boolean,
+    dataLabel: String,
+    onClick: () -> Unit,
+    label: Int = R.string.play,
+    icon: ImageVector = Icons.Rounded.PlayArrow,
+    width: Dp = 216.dp,
+    brush: Brush = Brush.horizontalGradient(listOf(Scarlet, Dbz.GiOrange, Dbz.SaiyanGold)),
+) {
     HudPanel(
         shape = HudShape(0.14f, 0.14f),
-        modifier = Modifier.width(216.dp),
-        brush = Brush.horizontalGradient(listOf(Scarlet, Dbz.GiOrange, Dbz.SaiyanGold)),
+        modifier = Modifier.width(width),
+        brush = brush,
         border = Dbz.BallLight,
         borderWidth = 2f,
         padding = PaddingValues(horizontal = 18.dp, vertical = 7.dp),
@@ -488,15 +509,15 @@ private fun PlayButton(installed: Boolean, dataLabel: String, onClick: () -> Uni
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Rounded.PlayArrow,
-                stringResource(R.string.play),
+                icon,
+                stringResource(label),
                 Modifier.size(22.dp),
                 tint = if (installed) Color.White else Color.White.copy(alpha = 0.45f),
             )
             Spacer(Modifier.width(6.dp))
             Column {
                 Text(
-                        stringResource(R.string.play),
+                        stringResource(label),
                     style = MaterialTheme.typography.titleMedium.copy(shadow = Shadow(Color.Black, Offset(1f, 1f))),
                     fontWeight = FontWeight.Black,
                     fontStyle = FontStyle.Italic,

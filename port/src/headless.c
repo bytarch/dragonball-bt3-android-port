@@ -218,6 +218,17 @@ int Port_NetMenuListed(void) {
     const char *e = getenv("BT3_MENU_ITEM4");
     return e == NULL || atoi(e) != 0;
 }
+/* BT3_NET_OPEN=1 (bt3_env.txt, written by the launcher's "Online"): the main menu asks for the online screen itself
+   instead of the player picking item 4 (src/menu/menu_a.c calls this as the menu is built). Once per start of the
+   program: a window closed again stays closed, and coming back from a session lands on the plain menu. */
+void Port_NetMenuAuto(void) {
+    static int done;
+    const char *e = getenv("BT3_NET_OPEN");
+    if (!done && e != NULL && atoi(e) != 0) {
+        done = 1;
+        Port_NetMenuOpen();
+    }
+}
 
 /* "Unlock everything" on the Cheats tab of the settings window (port/src/gs/ui.cpp): the game's own leftover debug
    function Save_UnlockAll (0x266088, no caller in the game): every character, stage, music track and item, the

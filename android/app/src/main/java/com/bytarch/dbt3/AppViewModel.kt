@@ -623,14 +623,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- launch
 
-    fun play() {
+    fun play() = launchGame(online = false)
+
+    /** Starts the game with the engine's own online screen opening by itself at the main menu (the loader's
+     * BT3_NET_OPEN switch; port/src/headless.c). */
+    fun playOnline() = launchGame(online = true)
+
+    private fun launchGame(online: Boolean) {
         when {
             _install.value !is InstallState.Installed -> say(str(R.string.msg_install_first))
             !engineAvailable -> say(str(R.string.msg_no_engine))
-            else -> getApplication<android.app.Application>().startActivity(
-                android.content.Intent(getApplication(), com.bytarch.dbt3.engine.GameActivity::class.java)
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
+            else -> {
+                paths.setOnlineEnv(online)
+                getApplication<android.app.Application>().startActivity(
+                    android.content.Intent(getApplication(), com.bytarch.dbt3.engine.GameActivity::class.java)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
         }
     }
 

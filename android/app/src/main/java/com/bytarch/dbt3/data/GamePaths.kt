@@ -30,10 +30,22 @@ class GamePaths(context: Context) {
     val songs = File(root, "songs")
     val saves = File(root, "saves")
     val settings = File(root, "bt3_settings.txt")
+    val engineEnv = File(root, "bt3_env.txt")
     val modLibrary = File(root, "modlib")
     val temp = File(context.cacheDir, "import")
 
     fun ensure() {
         listOf(gameData, textures, texturesOff, stages, songs, saves, modLibrary, temp).forEach { it.mkdirs() }
+    }
+
+    /** The loader's switch file (main/cpp/loader.c, NAME=value lines): while it holds BT3_NET_OPEN=1 the engine
+     * opens its own online screen by itself at the main menu, which is what the launcher's "Online" asks for. Any
+     * other line a player put in the file is kept. */
+    fun setOnlineEnv(on: Boolean) {
+        runCatching {
+            val kept = if (engineEnv.exists()) engineEnv.readLines().filterNot { it.startsWith("BT3_NET_OPEN") } else emptyList()
+            val lines = kept + if (on) listOf("BT3_NET_OPEN=1") else emptyList()
+            if (lines.isEmpty()) engineEnv.delete() else engineEnv.writeText(lines.joinToString("\n") + "\n")
+        }
     }
 }

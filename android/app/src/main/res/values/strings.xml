@@ -17,6 +17,8 @@
     <string name="remove">Remove</string>
     <string name="tagline">Budokai Tenkaichi 3 · Mobile</string>
     <string name="play">PLAY</string>
+    <string name="play_online">ONLINE</string>
+    <string name="play_online_sub">Create / join</string>
     <string name="game_data">Game data</string>
     <string name="game_data_intro">Pick your Budokai Tenkaichi 3 ISO (USA release, SLUS-21678). The app checks the image and unpacks the game data, like the PC port\'s setup. If you have no disc image, download one below.</string>
     <string name="pick_iso">Choose ISO</string>

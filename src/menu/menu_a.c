@@ -3,6 +3,7 @@
 #ifdef PORT
 extern void Port_NetMenuOpen(void);
 extern int Port_NetMenuListed(void);
+extern void Port_NetMenuAuto(void);
 extern int Port_NetSession(void);
 extern void Port_NetLeave(void);
 #endif
@@ -155,6 +156,9 @@ void MainMenu_Init(s32 section) {
         }
         gMainMenu->items[gMainMenu->itemCount++] = i;
     }
+#ifdef PORT
+    Port_NetMenuAuto(); /* port/src/headless.c: BT3_NET_OPEN, the launcher's "Online", opens the online screen */
+#endif
     gMainMenu->top = gMainMenu->itemCount - 1;
     for (i = 0; i < gMainMenu->itemCount; i++) {
         if (gMainMenu->items[i] == gProgress->mainMenuItem) {

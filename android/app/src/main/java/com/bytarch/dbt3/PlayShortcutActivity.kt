@@ -15,7 +15,9 @@ import com.bytarch.dbt3.engine.GameActivity
 class PlayShortcutActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val ready = GamePaths(this).installedMarker.exists() && EngineBridge.isAvailable(this)
+        val paths = GamePaths(this)
+        val ready = paths.installedMarker.exists() && EngineBridge.isAvailable(this)
+        if (ready) paths.setOnlineEnv(false) // the shortcut plays the game as it is, never the online screen
         val target = if (ready) GameActivity::class.java else MainActivity::class.java
         startActivity(Intent(this, target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()

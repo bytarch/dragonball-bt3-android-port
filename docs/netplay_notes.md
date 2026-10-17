@@ -895,3 +895,15 @@ relay address (it still connects directly).
 needed); real Windows (WinHTTP there, and the relay code's Windows build has only been compiled); a session
 longer than the login's three hours; the 32-bit build, which restarts the program for a session and so loses the
 relay address (it still connects directly).
+
+## The launcher's "Online" control on Android (2026-10-17)
+
+- The launcher (android/) has an ONLINE control beside PLAY (HomeScreen, `PlayButton`): it writes `BT3_NET_OPEN=1`
+  into `bt3_env.txt` in the game folder and starts the game. The loader passes the file's lines on as environment
+  (main/cpp/loader.c), and `MainMenu_Init` (src/menu/menu_a.c) asks for the online window by itself
+  (`Port_NetMenuAuto`, port/src/headless.c) as the main menu is built: the player lands in the lobby window without
+  navigating the game's menus, and creates or joins a room there as usual.
+- Once per start of the program: a window closed again stays closed, and coming back from a session lands on the
+  plain main menu. PLAY, and the home-screen shortcut, clear the switch again while keeping any other line the
+  player put in `bt3_env.txt`.
+- Not tried: a room made on one device and joined from another, both started this way.
