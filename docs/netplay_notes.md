@@ -985,6 +985,12 @@ relay address (it still connects directly).
   side left behind wins it. A match fought to the end still needs both sides, so a claimed win alone is worth
   nothing. `check_abandoned` in the selftest covers the leaver's silence, its late report, the leaver's confession
   and the untouched ordinary match.
+- **The opponent's record is on screen during the fight too.** The launcher knows it when it starts the match, so it
+  goes into the environment (`BT3_NET_PEER_NAME`, `BT3_NET_PEER_RECORD` "wins|losses", `BT3_NET_PEER_ID`); net.c keeps
+  it (`Port_NetPeerName` / `Port_NetPeerRecord` / `Port_NetPeerId`) and the Profile tab in the game prints the one line
+  under the recovery code - replacing the old "show my record to opponents" switch, which went when records became
+  public. Nothing is asked for during the fight: the service already said all of it in the match's answers. A session
+  made from the game's own lobby window has no such line in that tab (the lobby window shows the record itself).
 - A session that ended used to end the whole process, the desktop way: `relaunch()` execs `/proc/self/exe`, which on
   Android is the app's runtime and not this game, so the game died with signal 11 at address 0 the moment a session
   finished (or was lost) - a launcher match looked as if it "just exited", and the other side saw the packets stop.

@@ -211,7 +211,9 @@ void Match_SessionEnd(int won) {
         SDL_free(w);
         return;
     }
-    SDL_WaitThreadTimeout(t, &done, 3000); /* the POST is small; the program is ending and must not cut it short */
+    /* Waited for: on Android the program ends right after this (Port_NetLeave), and this one POST is what says an
+       abandoned match - the side that left cannot. Its own limit is the 12 seconds http_post gives every request. */
+    SDL_WaitThread(t, &done);
 }
 
 /* The record shown by Profile: the service is asked on its own thread, and the answer is kept between requests so the

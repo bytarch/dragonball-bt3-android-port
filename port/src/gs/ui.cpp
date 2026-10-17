@@ -35,6 +35,9 @@ int Port_NetRecord(int *wins, int *losses);    // gs/net_match.c: the record, -1
 const char *Port_NetId(void);                  // gs/net.c: this copy's recovery code (32 hex characters)
 int Port_NetIdSet(const char *code);           // gs/net.c: takes another machine's code, 1 when it was one
 int Port_NetShare(int set);                    // gs/net.c: whether opponents may see this record (-1 asks)
+const char *Port_NetPeerName(void);            // gs/net.c: the other player in this session, as the launcher found them
+const char *Port_NetPeerId(void);              // gs/net.c: their public id (records are looked up by it)
+int Port_NetPeerRecord(int *wins, int *losses);
 int Port_LobbyPeerRecord(int *wins, int *losses); // the other player's record, -1 when they keep it private
 void Match_AskRecord(const char *name);      // gs/net_match.c: asks the service what this copy's record is
 const char *Port_LobbyPeerPlatform(void);      // "PC", "Mobile", or "" when the service has not said
@@ -781,15 +784,23 @@ static void profile_tab(void) {
                               "nothing is lost: the old code still works there.");
     }
     ImGui::Spacing();
-    {   /* Whether opponents are shown this record. Off unless it is turned on: the service is told the choice
-           when the lobby next starts, so a change takes effect with the next match rather than at once. */
-        static bool share = Port_NetShare(-1) != 0;
-        ImGui::Checkbox("Show my record to opponents", &share);
-        if (ImGui::IsItemDeactivatedAfterEdit()) {
-            Port_NetShare(share);
+    {   /* The other player in this match, as the service knows them. Records are public, so there is no switch to hide
+           this one (the launcher passes the other side's in: BT3_NET_PEER_*), and the public id is what anybody can
+           look that record up by. */
+        int wins = 0, losses = 0;
+        const char *who = Port_NetPeerName();
+
+        if (who != NULL && who[0] != '\0') {
+            ImGui::Text("Opponent in this match");
+            if (Port_NetPeerRecord(&wins, &losses)) {
+                ImGui::TextDisabled("%s: %d won, %d lost", who, wins, losses);
+            } else {
+                ImGui::TextDisabled("%s: no record yet", who);
+            }
+            if (Port_NetPeerId()[0] != '\0') {
+                ImGui::TextDisabled("Public ID: %s", Port_NetPeerId());
+            }
         }
-        ImGui::SetItemTooltip("Only when this is on. The service tells the other player your wins and losses, and\n"
-                              "nobody else - not the recovery code, and not your name, which they get anyway.");
     }
     ImGui::Spacing();
     ImGui::TextWrapped("One name and one record for this machine. Changing either changes nothing else: not your "

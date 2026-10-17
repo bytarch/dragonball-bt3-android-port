@@ -919,6 +919,7 @@ int Port_NetActive(void) {
             sFromBoot = sSession; /* this copy was started for that session (the launcher did it), not joined from inside */
             /* the launcher did the matchmaking, so it hands over the room: the result is said against it (net_match.c) */
             Match_Room(getenv("BT3_NET_ROOM"), getenv("BT3_NET_KEY"));
+            take_the_other_player();
             net_start(host != NULL ? 1 : 2, host, join);
         }
     }
@@ -951,6 +952,48 @@ static void sample_local(unsigned tick) {
 #define QUIET_NS 6000000000ull /* this long without the input the game is waiting for: the other player is gone */
 
 static int sPeerGone; /* the session ended because the other player was lost, not because this one left (Port_NetLeave) */
+
+/* The other player in this session, as the launcher found them: their record is public, so it is passed in rather
+   than asked for during the fight (ponytail: a session made from the game's own lobby window has no such line here -
+   the lobby window shows the record itself, and Match_AskRecord brings this copy's own up to date). */
+static char sPeerName[32];
+static char sPeerId[24];
+static int sPeerWins = -1; /* -1: the service has not said */
+static int sPeerLosses;
+
+static void take_the_other_player(void) {
+    const char *name = getenv("BT3_NET_PEER_NAME"), *rec = getenv("BT3_NET_PEER_RECORD"), *id = getenv("BT3_NET_PEER_ID");
+    int w, l;
+
+    if (name != NULL) {
+        snprintf(sPeerName, sizeof(sPeerName), "%s", name);
+    }
+    if (id != NULL) {
+        snprintf(sPeerId, sizeof(sPeerId), "%s", id);
+    }
+    if (rec != NULL && sscanf(rec, "%d|%d", &w, &l) == 2 && w >= 0 && l >= 0) {
+        sPeerWins = w;
+        sPeerLosses = l;
+    }
+}
+
+const char *Port_NetPeerName(void) {
+    return Port_NetActive() ? sPeerName : "";
+}
+
+const char *Port_NetPeerId(void) {
+    return Port_NetActive() ? sPeerId : "";
+}
+
+/* 1 and this copy's opponent's wins and losses when the service has said them, 0 when it has not. */
+int Port_NetPeerRecord(int *wins, int *losses) {
+    if (!Port_NetActive() || sPeerWins < 0) {
+        return 0;
+    }
+    *wins = sPeerWins;
+    *losses = sPeerLosses;
+    return 1;
+}
 
 static void ended(const char *why, unsigned tick) {
     fprintf(stderr, "bt3: net: %s (blank %u)\n", why, tick);

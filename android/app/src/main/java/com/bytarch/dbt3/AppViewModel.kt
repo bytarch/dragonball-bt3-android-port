@@ -806,14 +806,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (room != null) withContext(Dispatchers.IO) { lobby.leave(room.first, room.second) }
         val port = lobby.localPort
         lobby.socket.close() // the engine binds this same port in a moment: see the class comment on MatchLobby
-        startMatch(port, wire, host, lobby.relayLogin, room)
+        startMatch(port, wire, host, lobby.relayLogin, room, peer)
         _online.value = OnlineState()
     }
 
     /** What net.c reads at boot for a session (the same lines it writes itself before restarting into one): this
      * side's role, the address found, the save folder that starts empty, and the relay login when this side holds a
      * relayed address (the engine takes the same allocation over, on the same port). */
-    private fun startMatch(port: Int, peer: String, host: Boolean, turn: MatchLobby.Turn?, room: Pair<String, String>? = null) {
+    private fun startMatch(
+        port: Int,
+        peer: String,
+        host: Boolean,
+        turn: MatchLobby.Turn?,
+        room: Pair<String, String>? = null,
+        who: MatchLobby.Peer? = null,   // the other player as the service knows them: name, record, public id
+    ) {
         val vars = mutableMapOf(
             "BT3_NET_SESSION" to "1",
             "BT3_NET_LOCALPORT" to "$port",
@@ -837,6 +844,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (room != null) {
             vars["BT3_NET_ROOM"] = room.first
             vars["BT3_NET_KEY"] = room.second
+        }
+        // who the other player is and what their record says, so the game can show it during the match (records
+        // are public: the service has already said this, and nothing is asked for again in the fight)
+        if (who != null) {
+            vars["BT3_NET_PEER_NAME"] = who.name
+            vars["BT3_NET_PEER_ID"] = who.id
+            who.record?.let { vars["BT3_NET_PEER_RECORD"] = "${it.first}|${it.second}" }
         }
         paths.setOnlineEnv(false)
         paths.clearNetSession()
