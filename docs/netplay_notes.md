@@ -961,6 +961,12 @@ relay address (it still connects directly).
   the home screen (next to the record) and the whole line on the online screen, and simply keeps the numbers at zero
   against a service that has not been restarted since this POST existed. `check_stats` in the service's own selftest
   (`python3 server.py --selftest`) is what proves the counts.
+- A match is counted as being played until something *says* it ended, not until its room row ages out: `playing` is
+  the rooms with both players and no settled result yet. The launcher gives its room up the moment the two sides know
+  each other (seconds before the fight, so `/v1/result` still finds it and the match still counts), which means
+  `done` says nothing about whether a match is on - only the report does; settling a match now also marks its room
+  done, so nobody may join a room whose match is over. Without this the two players of a finished match stayed on the
+  board for as long as the room lives (ten minutes), which is what the counts showed.
 - **Records are public, stored by the service, and looked up by a public id.** The service already had the counting
   machinery (`players` / `results`, settled when both sides agree); what the launcher path never did was reach it, so
   nothing was stored: the engine's report needs the room the match came from, only its own lobby remembers one, and
