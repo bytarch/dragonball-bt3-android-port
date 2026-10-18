@@ -967,6 +967,19 @@ relay address (it still connects directly).
   `done` says nothing about whether a match is on - only the report does; settling a match now also marks its room
   done, so nobody may join a room whose match is over. Without this the two players of a finished match stayed on the
   board for as long as the room lives (ten minutes), which is what the counts showed.
+- **A rematch is a match of its own, on both sides of the account.** The engine counts the fights of a session
+  (`sFights` in net_match.c, where every report goes through) and each report says which fight it is (`fight` in the
+  body); `results` is keyed `(code, id, fight)` and settled per fight, so the second fight of a room counts again -
+  `ALTER TABLE` cannot add a column to a key, so a database from before this has its `results` table made again (every
+  fight in it is fight 0). A room is still not a farm: the abandoned shortcut (one side's word alone, because the
+  player who left cannot say anything) settles a room's **first** fight only, so nobody can claim fifty abandoned
+  wins by walking away from fifty rematches; a rematch both sides saw the end of is settled the ordinary way.
+  `check_rematch` in the selftest is what proves it.
+- **What is said where:** only an online match is said to the service (the whole report path is inside
+  `Port_NetSession()`), and only an online match may count there. The device's own file gets one line per decided
+  fight, online or not (headless.c: the same "a winner bit is in the result block" test the game itself uses, once per
+  fight, never during a rollback's re-run, and not for mode 7 - the attract demo, CPU against CPU). So a local fight
+  is in the player's record on their device and nobody else's.
 - **Records are public, stored by the service, and looked up by a public id.** The service already had the counting
   machinery (`players` / `results`, settled when both sides agree); what the launcher path never did was reach it, so
   nothing was stored: the engine's report needs the room the match came from, only its own lobby remembers one, and

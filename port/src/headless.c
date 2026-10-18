@@ -394,11 +394,30 @@ void Port_Trace(unsigned vblanks) {
             said = 1; /* 0 or 1 is a side that won; 4 is a draw and 8 an abort, and neither is a match result */
             fprintf(stderr, "bt3: net: the match is over, side %d won\n", (int)winner);
             Match_Report((int)winner == (int)Port_NetMe());
-            Port_RecordBattle(Battle_GetMode(), BattleResult_GetFlags(), BattleResult_GetReason(), Port_NetMe()); /* the battle pass reads it */
         }
         if (gBtlSeq == NULL || gBtlSeq->state <= 3) {
             said = 0; /* the next fight is a match of its own */
             lastState = gBtlSeq != NULL ? gBtlSeq->state : -1;
+        }
+    }
+    /* One line per decided fight on this device, an online match or a local one (bt3_battles.txt; the launcher's
+       record screen reads it back). Only an online match is said to the service, which is the block above. The
+       game's own test for "decided" is a winner bit in the result block (BattleResult_GetFlags), which is set in
+       the same tick the fight ends - BtlSeq_CheckBattleEnd cannot be used for this, see the note there. A rollback's
+       re-run must not write a second line, and the flag is cleared once the next fight is under way. Mode 7 is the
+       attract demo (CPU against CPU, nobody playing: include/battle/battle_setup.h), which is not the player's fight
+       and is not written. Outside a session the player is side 0, which is the side they play. */
+    {
+        static int recorded;
+
+        if (gBtlSeq != NULL && !gPortResim && gBtlSeq->state >= 4 && !recorded && Battle_GetMode() != 7 &&
+            (BattleResult_GetFlags() & 0x1F) != 0) {
+            recorded = 1;
+            Port_RecordBattle(Battle_GetMode(), BattleResult_GetFlags(), BattleResult_GetReason(),
+                Port_NetSession() ? Port_NetMe() : 0);
+        }
+        if (gBtlSeq == NULL || gBtlSeq->state <= 3) {
+            recorded = 0;
         }
     }
     if ((sBattles != 0 || sFromMenu) && gBtlSeq != NULL && getenv("BT3_TRACE_SEQ") != NULL) { /* when the battle sequence changes state */

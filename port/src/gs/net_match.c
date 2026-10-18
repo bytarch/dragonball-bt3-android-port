@@ -51,6 +51,12 @@ static int http_post(const char *what, const char *json, char *out, size_t size)
 /* The match the lobby found, kept after the search thread is gone: the session that follows has no room code or
    key of its own, and the record is said against the room the match was found in (Match_Report). */
 static char sRoomCode[8], sRoomKey[40];
+
+/* Which fight of the room a report is about: a rematch plays again in the same room and is a match of its own
+   (server.py settles every fight on its own). Counted here, where every report goes through, so both sides number
+   their fights the same way. Zero until a fight has been reported; a session that ends without one is about the
+   fight that was under way, which is that same number. */
+static int sFights;
 static int sRecordWins, sRecordLosses, sRecordKnown = -1;
 static SDL_AtomicInt sRecordAskBusy;
 static uint64_t sRecordAskedAt;
@@ -125,10 +131,11 @@ void Match_Room(const char *code, const char *key) {
     SDL_UnlockMutex(sM.lock);
 }
 
-/* One POST of how the match went, on its own thread: the game is back in the menu by the time this is called and
-   must not wait for the service, and the match is over anyway. */
+/* One POST of how the fight went, on its own thread: the game is back in the menu by the time this is called and
+   must not wait for the service, and the fight is over anyway. [fight] is which fight of the room this was: a
+   rematch plays again in the same room and is a match of its own (server.py rank_settle settles each one). */
 static int SDLCALL report_thread(void *arg) {
-    char code[8], key[40], body[192], answer[512];
+    char code[8], key[40], body[224], answer[512];
     int *w = (int *)arg;
 
     SDL_LockMutex(sM.lock);
@@ -140,10 +147,12 @@ static int SDLCALL report_thread(void *arg) {
         SDL_free(w);
         return 0;
     }
-    SDL_snprintf(body, sizeof(body), "{\"code\":\"%s\",\"key\":\"%s\",\"id\":\"%s\",\"won\":%s,\"rated\":true}",
-                 code, key, Port_NetId(), w[0] != 0 ? "true" : "false");
+    SDL_snprintf(body, sizeof(body),
+                 "{\"code\":\"%s\",\"key\":\"%s\",\"id\":\"%s\",\"won\":%s,\"rated\":true,\"fight\":%d}", code, key,
+                 Port_NetId(), w[0] != 0 ? "true" : "false", w[1]);
     http_post("result", body, answer, sizeof(answer));
-    fprintf(stderr, "bt3: net: said how the match went (room %s, %s won)\n", code, w[0] != 0 ? "this side" : "the other side");
+    fprintf(stderr, "bt3: net: said how the match went (room %s, fight %d, %s won)\n", code, w[1],
+            w[0] != 0 ? "this side" : "the other side");
     /* The record the window shows is this copy's, so it is asked for again rather than waited for: the pause
        menu and the next lobby draw the new numbers without anything being reopened.
 
@@ -159,12 +168,13 @@ static int SDLCALL report_thread(void *arg) {
 }
 
 void Match_Report(int won) {
-    int *w = (int *)SDL_malloc(sizeof(int));
+    int *w = (int *)SDL_malloc(2 * sizeof(int));
 
     if (w == NULL) {
         return;
     }
     w[0] = won;
+    w[1] = sFights++;
     SDL_CreateThread(report_thread, "bt3record", w);
 }
 
@@ -188,17 +198,17 @@ static int SDLCALL abandon_thread(void *arg) {
         return 0;
     }
     SDL_snprintf(body, sizeof(body),
-                 "{\"code\":\"%s\",\"key\":\"%s\",\"id\":\"%s\",\"won\":%s,\"rated\":true,\"abandoned\":true}", code,
-                 key, Port_NetId(), w[0] != 0 ? "true" : "false");
+                 "{\"code\":\"%s\",\"key\":\"%s\",\"id\":\"%s\",\"won\":%s,\"rated\":true,\"abandoned\":true,\"fight\":%d}",
+                 code, key, Port_NetId(), w[0] != 0 ? "true" : "false", w[1]);
     http_post("result", body, answer, sizeof(answer));
-    fprintf(stderr, "bt3: net: said the match was abandoned (room %s, %s won)\n", code,
+    fprintf(stderr, "bt3: net: said the match was abandoned (room %s, fight %d, %s won)\n", code, w[1],
             w[0] != 0 ? "this side" : "the other side");
     SDL_free(w);
     return 0;
 }
 
 void Match_SessionEnd(int won) {
-    int *w = (int *)SDL_malloc(sizeof(int));
+    int *w = (int *)SDL_malloc(2 * sizeof(int));
     SDL_Thread *t;
     int done = 0;
 
@@ -206,6 +216,7 @@ void Match_SessionEnd(int won) {
         return;
     }
     w[0] = won;
+    w[1] = sFights; /* the fight that was under way: nothing has been reported for it */
     t = SDL_CreateThread(abandon_thread, "bt3gone", w);
     if (t == NULL) {
         SDL_free(w);
